@@ -6,12 +6,10 @@ import { env } from "./config/env.js";
 
 async function startServer() {
   try {
-    // Initialize MongoDB connection if using MongoDB storage
-    if (env.storageMode === 'mongodb') {
-      const mongoConnection = MongoDBConnection.getInstance();
-      await mongoConnection.connect();
-      console.log('MongoDB connection initialized');
-    }
+    // Initialize MongoDB connection
+    const mongoConnection = MongoDBConnection.getInstance();
+    await mongoConnection.connect();
+    console.log('MongoDB connection initialized');
 
     // Start MCP server
     await app.start();
