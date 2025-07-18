@@ -6,16 +6,23 @@ import { MongoDBConnection } from '../connection/mongodb-connection.js';
 import { getCollectionNames } from '../../../main/config/mongodb-config.js';
 
 export class MongoDBProjectRepository implements ProjectRepository {
-  private db: Db;
-  private collection: Collection<ProjectDocument>;
+  private db?: Db;
+  private collection?: Collection<ProjectDocument>;
 
   constructor() {
-    this.db = MongoDBConnection.getInstance().getDatabase();
-    this.collection = this.db.collection<ProjectDocument>(getCollectionNames().projects);
+    // Initialize lazily to avoid connection issues
+  }
+
+  private async ensureConnection(): Promise<void> {
+    if (!this.db) {
+      this.db = await MongoDBConnection.getInstance().getDatabase();
+      this.collection = this.db.collection<ProjectDocument>(getCollectionNames().projects);
+    }
   }
 
   async ensureProject(projectName: string): Promise<void> {
-    const existing = await this.collection.findOne({ name: projectName });
+    await this.ensureConnection();
+    const existing = await this.collection!.findOne({ name: projectName });
     
     if (!existing) {
       const project: ProjectDocument = {
@@ -26,10 +33,10 @@ export class MongoDBProjectRepository implements ProjectRepository {
         tags: []
       };
 
-      await this.collection.insertOne(project);
+      await this.collection!.insertOne(project);
     } else {
       // Update last accessed time
-      await this.collection.updateOne(
+      await this.collection!.updateOne(
         { name: projectName },
         { $set: { lastAccessed: new Date() } }
       );
@@ -37,7 +44,8 @@ export class MongoDBProjectRepository implements ProjectRepository {
   }
 
   async listProjects(): Promise<ProjectName[]> {
-    const docs = await this.collection
+    await this.ensureConnection();
+    const docs = await this.collection!
       .find({})
       .sort({ lastAccessed: -1 })
       .toArray();
@@ -46,16 +54,19 @@ export class MongoDBProjectRepository implements ProjectRepository {
   }
 
   async projectExists(name: string): Promise<boolean> {
-    const doc = await this.collection.findOne({ name });
+    await this.ensureConnection();
+    const doc = await this.collection!.findOne({ name });
     return doc !== null;
   }
 
   async getProject(projectName: string): Promise<Project | null> {
-    const doc = await this.collection.findOne({ name: projectName });
+    await this.ensureConnection();
+    const doc = await this.collection!.findOne({ name: projectName });
     return doc ? this.documentToProject(doc) : null;
   }
 
   async updateProject(project: Project): Promise<Project> {
+    await this.ensureConnection();
     const doc: ProjectDocument = {
       name: project.name,
       description: project.description,
@@ -65,7 +76,7 @@ export class MongoDBProjectRepository implements ProjectRepository {
       tags: project.tags
     };
 
-    await this.collection.replaceOne(
+    await this.collection!.replaceOne(
       { name: project.name },
       doc,
       { upsert: true }
@@ -75,14 +86,16 @@ export class MongoDBProjectRepository implements ProjectRepository {
   }
 
   async deleteProject(projectName: string): Promise<boolean> {
-    const result = await this.collection.deleteOne({ name: projectName });
+    await this.ensureConnection();
+    const result = await this.collection!.deleteOne({ name: projectName });
     return result.deletedCount > 0;
   }
 
   async incrementMemoryCount(projectName: string): Promise<void> {
-    await this.collection.updateOne(
+    await this.ensureConnection();
+    await this.collection!.updateOne(
       { name: projectName },
-      { 
+      {
         $inc: { memoryCount: 1 },
         $set: { lastAccessed: new Date() }
       }
@@ -90,9 +103,10 @@ export class MongoDBProjectRepository implements ProjectRepository {
   }
 
   async decrementMemoryCount(projectName: string): Promise<void> {
-    await this.collection.updateOne(
+    await this.ensureConnection();
+    await this.collection!.updateOne(
       { name: projectName },
-      { 
+      {
         $inc: { memoryCount: -1 },
         $set: { lastAccessed: new Date() }
       }

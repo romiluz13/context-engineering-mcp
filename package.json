@@ -1,6 +1,6 @@
 {
   "name": "mongodb-memory-bank-mcp",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "MCP server for remote management of project memory banks with MongoDB backend",
   "repository": {
     "type": "git",

@@ -46,7 +46,14 @@ export class MongoDBConnection {
     }
   }
 
-  public getDatabase(): Db {
+  public async getDatabase(): Promise<Db> {
+    if (!this.database) {
+      await this.connect();
+    }
+    return this.database!;
+  }
+
+  public getDatabaseSync(): Db {
     if (!this.database) {
       throw new Error('Database not connected. Call connect() first.');
     }

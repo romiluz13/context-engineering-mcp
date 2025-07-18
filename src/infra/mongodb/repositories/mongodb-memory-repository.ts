@@ -7,17 +7,24 @@ import { getCollectionNames, mongoConfig } from '../../../main/config/mongodb-co
 import { VoyageEmbeddingService } from '../../ai/voyage-embedding-service.js';
 
 export class MongoDBMemoryRepository implements MemoryRepository {
-  private db: Db;
-  private collection: Collection<MemoryDocument>;
+  private db?: Db;
+  private collection?: Collection<MemoryDocument>;
   private embeddingService: VoyageEmbeddingService;
 
   constructor() {
-    this.db = MongoDBConnection.getInstance().getDatabase();
-    this.collection = this.db.collection<MemoryDocument>(getCollectionNames().memories);
+    // Initialize lazily to avoid connection issues
     this.embeddingService = new VoyageEmbeddingService();
   }
 
+  private async ensureConnection(): Promise<void> {
+    if (!this.db) {
+      this.db = await MongoDBConnection.getInstance().getDatabase();
+      this.collection = this.db.collection<MemoryDocument>(getCollectionNames().memories);
+    }
+  }
+
   async store(memory: Memory): Promise<Memory> {
+    await this.ensureConnection();
     // Generate embedding for Atlas deployments
     let contentVector = memory.contentVector;
     if (this.embeddingService.isAvailable() && !contentVector) {
@@ -38,14 +45,14 @@ export class MongoDBMemoryRepository implements MemoryRepository {
       summary: memory.summary
     };
 
-    const result = await this.collection.replaceOne(
+    const result = await this.collection!.replaceOne(
       { projectName: memory.projectName, fileName: memory.fileName },
       doc,
       { upsert: true }
     );
 
     // Get the inserted/updated document with ID
-    const savedDoc = await this.collection.findOne({
+    const savedDoc = await this.collection!.findOne({
       projectName: memory.projectName,
       fileName: memory.fileName
     });
@@ -54,7 +61,8 @@ export class MongoDBMemoryRepository implements MemoryRepository {
   }
 
   async load(projectName: string, fileName: string): Promise<Memory | null> {
-    const doc = await this.collection.findOne({
+    await this.ensureConnection();
+    const doc = await this.collection!.findOne({
       projectName,
       fileName
     });
@@ -63,6 +71,7 @@ export class MongoDBMemoryRepository implements MemoryRepository {
   }
 
   async update(projectName: string, fileName: string, content: string): Promise<Memory | null> {
+    await this.ensureConnection();
     const updateDoc = {
       $set: {
         content,
@@ -71,7 +80,7 @@ export class MongoDBMemoryRepository implements MemoryRepository {
       }
     };
 
-    const result = await this.collection.findOneAndUpdate(
+    const result = await this.collection!.findOneAndUpdate(
       { projectName, fileName },
       updateDoc,
       { returnDocument: 'after' }
@@ -81,7 +90,8 @@ export class MongoDBMemoryRepository implements MemoryRepository {
   }
 
   async delete(projectName: string, fileName: string): Promise<boolean> {
-    const result = await this.collection.deleteOne({
+    await this.ensureConnection();
+    const result = await this.collection!.deleteOne({
       projectName,
       fileName
     });
@@ -90,7 +100,8 @@ export class MongoDBMemoryRepository implements MemoryRepository {
   }
 
   async listByProject(projectName: string): Promise<Memory[]> {
-    const docs = await this.collection
+    await this.ensureConnection();
+    const docs = await this.collection!
       .find({ projectName })
       .sort({ lastModified: -1 })
       .toArray();
@@ -99,7 +110,8 @@ export class MongoDBMemoryRepository implements MemoryRepository {
   }
 
   async listAll(): Promise<Memory[]> {
-    const docs = await this.collection
+    await this.ensureConnection();
+    const docs = await this.collection!
       .find({})
       .sort({ lastModified: -1 })
       .toArray();
@@ -108,6 +120,7 @@ export class MongoDBMemoryRepository implements MemoryRepository {
   }
 
   async search(params: MemorySearchParams): Promise<MemorySearchResult[]> {
+    await this.ensureConnection();
     const { query, projectName, tags, limit = 10, useSemanticSearch = false } = params;
 
     // Use semantic search for Atlas, text search for Community
@@ -146,7 +159,7 @@ export class MongoDBMemoryRepository implements MemoryRepository {
       { $limit: limit }
     ];
 
-    const docs = await this.collection.aggregate<MemorySearchDocument>(pipeline).toArray();
+    const docs = await this.collection!.aggregate<MemorySearchDocument>(pipeline).toArray();
     return docs.map(doc => ({
       ...this.documentToMemory(doc),
       score: doc.score,
@@ -160,6 +173,7 @@ export class MongoDBMemoryRepository implements MemoryRepository {
     commonTags: string[];
     lastActivity: Date;
   }> {
+    await this.ensureConnection();
     const pipeline = [
       { $match: { projectName } },
       {
@@ -187,7 +201,7 @@ export class MongoDBMemoryRepository implements MemoryRepository {
       }
     ];
 
-    const result = await this.collection.aggregate(pipeline).toArray();
+    const result = await this.collection!.aggregate(pipeline).toArray();
     const stats = result[0];
 
     return {
@@ -213,7 +227,7 @@ export class MongoDBMemoryRepository implements MemoryRepository {
       searchQuery.tags = { $in: tags };
     }
 
-    const docs = await this.collection
+    const docs = await this.collection!
       .find(searchQuery)
       .sort({ score: { $meta: 'textScore' } })
       .limit(limit)
@@ -294,7 +308,7 @@ export class MongoDBMemoryRepository implements MemoryRepository {
     pipeline.push({ $limit: limit });
 
     try {
-      const docs = await this.collection.aggregate<MemorySearchDocument>(pipeline).toArray();
+      const docs = await this.collection!.aggregate<MemorySearchDocument>(pipeline).toArray();
       return docs.map(doc => ({
         ...this.documentToMemory(doc),
         score: doc.score || 1.0,
