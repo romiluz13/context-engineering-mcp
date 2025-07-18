@@ -6,6 +6,7 @@ export interface MongoDBListProjectFilesRequest {
   projectName: string;
 }
 
+// Keep FileInfo interface for potential future enhanced tools
 export interface FileInfo {
   fileName: string;
   lastModified: string;
@@ -13,6 +14,7 @@ export interface FileInfo {
   tags: string[];
 }
 
-export type MongoDBListProjectFilesResponse = FileInfo[];
+// Core tool returns simple string array for backward compatibility
+export type MongoDBListProjectFilesResponse = string[];
 
 export { Controller, Request, Response, Validator, MemoryRepository };

@@ -30,15 +30,12 @@ export class MongoDBListProjectFilesController
       const { projectName } = request.body!;
 
       const memories = await this.memoryRepository.listByProject(projectName);
-      
-      const fileInfos: FileInfo[] = memories.map(memory => ({
-        fileName: memory.fileName,
-        lastModified: memory.lastModified.toISOString(),
-        wordCount: memory.wordCount,
-        tags: memory.tags
-      }));
 
-      return ok(fileInfos);
+      // Return simple string array like original alioshr implementation
+      // This ensures backward compatibility with existing MCP clients
+      const fileNames: string[] = memories.map(memory => memory.fileName);
+
+      return ok(fileNames);
     } catch (error) {
       return serverError(error as Error);
     }

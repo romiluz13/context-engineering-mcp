@@ -7,8 +7,32 @@ import { makeMongoDBListProjectsController } from "../../factories/controllers/m
 import { makeMongoDBListProjectFilesController } from "../../factories/controllers/mongodb-list-project-files/mongodb-list-project-files-controller-factory.js";
 import { makeMongoDBUpdateController } from "../../factories/controllers/mongodb-update/mongodb-update-controller-factory.js";
 
+// Memory Bank Intelligence controllers (NEW - alioshr patterns) - TEMPORARILY DISABLED
+// import { makeMemoryBankValidateController } from "../../factories/controllers/memory-bank-validate/index.js";
+// import { makeMemoryBankInitController } from "../../factories/controllers/memory-bank-init/index.js";
+// import { makeMemoryBankContextController } from "../../factories/controllers/memory-bank-context/index.js";
+
 import { adaptMcpRequestHandler } from "./adapters/mcp-request-adapter.js";
 import { McpRouterAdapter } from "./adapters/mcp-router-adapter.js";
+
+// Backward-compatible adapter for memory_bank_read
+const adaptMemoryBankRead = (controller: any) => {
+  return adaptMcpRequestHandler({
+    handle: async (request: any) => {
+      const response = await controller.handle(request);
+
+      // If successful and has memory data, return only content string
+      if (response.statusCode === 200 && response.body && typeof response.body === 'object' && response.body.content) {
+        return {
+          ...response,
+          body: response.body.content // Return only content string like original alioshr
+        };
+      }
+
+      return response;
+    }
+  });
+};
 
 export default () => {
   const router = new McpRouterAdapter();
@@ -64,7 +88,7 @@ export default () => {
         required: ["projectName", "fileName"],
       },
     },
-    handler: adaptMcpRequestHandler(makeMemoryLoadController()),
+    handler: adaptMemoryBankRead(makeMemoryLoadController()),
   });
 
   router.setTool({
@@ -186,6 +210,65 @@ export default () => {
     },
     handler: adaptMcpRequestHandler(makeMemoryDiscoverController()),
   });
+
+  // MEMORY BANK INTELLIGENCE TOOLS - ORIGINAL ALIOSHR PATTERNS - TEMPORARILY DISABLED
+  // TODO: Re-enable after implementing all controller files
+
+  /*
+  router.setTool({
+    schema: {
+      name: "memory_bank_validate",
+      description: "Pre-flight validation: Check project existence, core files presence, and identify missing files. Essential before any memory bank operations.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectName: {
+            type: "string",
+            description: "The name of the project to validate",
+          },
+        },
+        required: ["projectName"],
+      },
+    },
+    handler: adaptMcpRequestHandler(makeMemoryBankValidateController()),
+  });
+
+  router.setTool({
+    schema: {
+      name: "memory_bank_init",
+      description: "Initialize memory bank project: Create project and establish core files structure (projectbrief.md, productContext.md, etc.) with templates.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectName: {
+            type: "string",
+            description: "The name of the project to initialize",
+          },
+        },
+        required: ["projectName"],
+      },
+    },
+    handler: adaptMcpRequestHandler(makeMemoryBankInitController()),
+  });
+
+  router.setTool({
+    schema: {
+      name: "memory_bank_context",
+      description: "Read complete project context: Returns all core files in hierarchical order (foundation → active → tracking) for comprehensive project understanding.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectName: {
+            type: "string",
+            description: "The name of the project to read context from",
+          },
+        },
+        required: ["projectName"],
+      },
+    },
+    handler: adaptMcpRequestHandler(makeMemoryBankContextController()),
+  });
+  */
 
   return router;
 };
