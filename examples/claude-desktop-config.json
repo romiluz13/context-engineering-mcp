@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "memory-bank-mongodb": {
+      "command": "node",
+      "args": ["/path/to/context-engineering-mcp/dist/main/index.js"],
+      "env": {
+        "STORAGE_MODE": "mongodb",
+        "MONGODB_URI": "mongodb://localhost:27017",
+        "MONGODB_DATABASE": "memory_bank",
+        "MONGODB_ATLAS": "false",
+        "ENABLE_VECTOR_SEARCH": "false"
+      }
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import fs from "fs-extra";
 import path from "path";
 import { ProjectRepository } from "../../../data/protocols/project-repository.js";
-import { Project } from "../../../domain/entities/index.js";
+import { ProjectName } from "../../../domain/entities/index.js";
 
 /**
  * Filesystem implementation of the ProjectRepository protocol
@@ -25,11 +25,11 @@ export class FsProjectRepository implements ProjectRepository {
 
   /**
    * Lists all available projects
-   * @returns An array of Project objects
+   * @returns An array of project names
    */
-  async listProjects(): Promise<Project[]> {
+  async listProjects(): Promise<ProjectName[]> {
     const entries = await fs.readdir(this.rootDir, { withFileTypes: true });
-    const projects: Project[] = entries
+    const projects: ProjectName[] = entries
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name);
 

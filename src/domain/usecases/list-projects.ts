@@ -1,5 +1,5 @@
-import { Project } from "../entities/index.js";
+import { ProjectName } from "../entities/index.js";
 
 export interface ListProjectsUseCase {
-  listProjects(): Promise<Project[]>;
+  listProjects(): Promise<ProjectName[]>;
 }

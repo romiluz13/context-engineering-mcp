@@ -1,7 +1,7 @@
-import { Project } from "../../domain/entities/index.js";
+import { Project, ProjectName } from "../../domain/entities/index.js";
 
 export interface ProjectRepository {
-  listProjects(): Promise<Project[]>;
+  listProjects(): Promise<ProjectName[]>;
   projectExists(name: string): Promise<boolean>;
   ensureProject(name: string): Promise<void>;
 }

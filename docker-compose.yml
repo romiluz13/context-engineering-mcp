@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # MongoDB Community for local development
+  mongodb:
+    image: mongo:7.0
+    container_name: memory-bank-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: memory_bank
+    volumes:
+      - mongodb_data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - memory-bank-network
+
+  # Memory Bank MCP Server
+  memory-bank-mcp:
+    build: .
+    container_name: memory-bank-mcp-server
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+    environment:
+      STORAGE_MODE: mongodb
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/memory_bank?authSource=admin
+      MONGODB_DATABASE: memory_bank
+      MONGODB_ATLAS: false
+      ENABLE_VECTOR_SEARCH: false
+    networks:
+      - memory-bank-network
+    # For stdio transport, no ports needed
+    # For HTTP transport, uncomment:
+    # ports:
+    #   - "3000:3000"
+
+volumes:
+  mongodb_data:
+
+networks:
+  memory-bank-network:
+    driver: bridge
