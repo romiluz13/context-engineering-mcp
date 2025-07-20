@@ -615,57 +615,14 @@ async function smartProjectFallback(workingDirectory: string, existingSignals: P
       return null;
     }
 
-    if (existingProjects.length === 1) {
-      // Only one project exists - use it automatically with high confidence
-      const projectName = existingProjects[0];
-      const fallbackSignal: ProjectSignal = {
-        type: 'smart-default',
-        confidence: 90,
-        projectName,
-        evidence: [
-          'Only one project exists in memory bank',
-          `Auto-selected: ${projectName}`,
-          `Working directory: ${workingDirectory}`
-        ]
-      };
+    // REMOVED: Auto-selection of single project - this breaks project isolation!
+    // The system must ALWAYS respect the working directory, not auto-select existing projects
 
-      return {
-        projectName,
-        confidence: 90,
-        detectionMethod: 'smart-default',
-        workingDirectory,
-        signals: [...existingSignals, fallbackSignal],
-        metadata: {
-          projectMarkers: ['single-project-auto-selection']
-        }
-      };
-    }
+    // REMOVED: Auto-selection of most recent project - this breaks project isolation!
+    // The system must ALWAYS respect the working directory and create new projects as needed
 
-    // Multiple projects exist - need AI-assisted selection
-    // For now, use most recently accessed project with medium confidence
-    const mostRecentProject = existingProjects[0]; // Already sorted by lastAccessed DESC
-    const fallbackSignal: ProjectSignal = {
-      type: 'smart-default',
-      confidence: 75,
-      projectName: mostRecentProject,
-      evidence: [
-        `Multiple projects found: ${existingProjects.length}`,
-        `Using most recent: ${mostRecentProject}`,
-        'Consider implementing AI-assisted selection for better accuracy'
-      ]
-    };
-
-    return {
-      projectName: mostRecentProject,
-      confidence: 75,
-      detectionMethod: 'smart-default',
-      workingDirectory,
-      signals: [...existingSignals, fallbackSignal],
-      metadata: {
-        projectMarkers: ['multi-project-recent-selection'],
-        recentFiles: existingProjects
-      }
-    };
+    // Return null to force directory-based detection
+    return null;
 
   } catch (error) {
     console.error('[SMART-FALLBACK] Error accessing existing projects:', error);
@@ -673,20 +630,68 @@ async function smartProjectFallback(workingDirectory: string, existingSignals: P
   }
 }
 
+// Session-based project cache for MCP environments
+// Since MCP servers don't have access to client working directory,
+// we cache the last detected project from explicit detect_project_context_secure calls
+let cachedProjectName: string | null = null;
+let cacheTimestamp: number = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Sets the cached project name from explicit project detection
+ * Called by detect_project_context_secure tool
+ */
+export function setCachedProjectName(projectName: string): void {
+  cachedProjectName = projectName;
+  cacheTimestamp = Date.now();
+  console.log(`[PROJECT-CACHE] Set cached project: "${projectName}" at ${new Date().toISOString()}`);
+  console.log(`[PROJECT-CACHE] Cache state: name="${cachedProjectName}", timestamp=${cacheTimestamp}`);
+}
+
+/**
+ * Gets the cached project name if still valid
+ */
+export function getCachedProjectName(): string | null {
+  console.log(`[PROJECT-CACHE] Checking cache: name="${cachedProjectName}", timestamp=${cacheTimestamp}`);
+
+  if (!cachedProjectName) {
+    console.log(`[PROJECT-CACHE] No cached project name`);
+    return null;
+  }
+
+  const now = Date.now();
+  const age = now - cacheTimestamp;
+  console.log(`[PROJECT-CACHE] Cache age: ${age}ms (max: ${CACHE_DURATION}ms)`);
+
+  if (age > CACHE_DURATION) {
+    console.log(`[PROJECT-CACHE] Cache expired for project: "${cachedProjectName}"`);
+    cachedProjectName = null;
+    return null;
+  }
+
+  console.log(`[PROJECT-CACHE] Using cached project: "${cachedProjectName}"`);
+  return cachedProjectName;
+}
+
 /**
  * Enhanced project detection for MCP environments
- * Combines universal detection with MCP-specific context
+ * SIMPLIFIED: Always use directory-based detection, no auto-selection
  */
 export async function detectProjectForMCP(mcpContext?: any): Promise<string> {
   try {
-    // Check for MCP-provided working directory
+    // SIMPLIFIED APPROACH: Always use directory-based detection
+    // No more auto-selection or caching - this ensures predictable behavior
     const mcpWorkingDir = process.env.MCP_WORKING_DIRECTORY ||
                          mcpContext?.workingDirectory ||
                          process.cwd();
 
     const detection = await detectProjectUniversally(mcpWorkingDir);
 
-    // Log detection for debugging (following MongoDB MCP patterns)
+    // Log detection for debugging
+    console.log(`[UNIVERSAL-PROJECT-DETECTION] process.cwd(): ${process.cwd()}`);
+    console.log(`[UNIVERSAL-PROJECT-DETECTION] MCP_WORKING_DIRECTORY: ${process.env.MCP_WORKING_DIRECTORY || 'undefined'}`);
+    console.log(`[UNIVERSAL-PROJECT-DETECTION] mcpContext?.workingDirectory: ${mcpContext?.workingDirectory || 'undefined'}`);
+    console.log(`[UNIVERSAL-PROJECT-DETECTION] Final Working Dir: ${mcpWorkingDir}`);
     console.log(`[UNIVERSAL-PROJECT-DETECTION] Method: ${detection.detectionMethod}, Confidence: ${detection.confidence}%, Project: "${detection.projectName}"`);
 
     return detection.projectName;

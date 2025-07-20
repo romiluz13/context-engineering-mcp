@@ -1,4 +1,5 @@
 import { badRequest, ok, serverError } from "../../helpers/index.js";
+import { setCachedProjectName } from "../../../shared/utils/project-name-normalizer.js";
 import {
   Controller,
   Request,
@@ -48,6 +49,12 @@ export class ProjectContextDetectionController
       };
 
       const result = await this.projectContextDetectionUseCase.detectProjectContext(domainRequest);
+
+      // CRITICAL FIX: Cache the detected project name for subsequent memory bank operations
+      // This solves the MCP working directory limitation
+      if (result.success && result.result?.projectName) {
+        setCachedProjectName(result.result.projectName);
+      }
 
       return ok(result);
     } catch (error) {

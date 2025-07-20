@@ -97,6 +97,14 @@ export default () => {
             type: "string",
             description: "The content of the file",
           },
+          workingDirectory: {
+            type: "string",
+            description: "Optional working directory for project detection (defaults to auto-detection)",
+          },
+          projectName: {
+            type: "string",
+            description: "Optional explicit project name (overrides auto-detection)",
+          },
         },
         required: ["fileName", "content"],
       },

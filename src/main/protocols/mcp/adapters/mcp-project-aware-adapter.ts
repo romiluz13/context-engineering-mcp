@@ -49,10 +49,28 @@ export const adaptUniversalMcpRequestHandler = async <
     let body = params?.arguments as T;
 
     try {
-      // Use universal project detection system
-      const projectName = await detectProjectForMCP(request);
+      // CRITICAL FIX: Use workingDirectory parameter if provided
+      let projectName: string;
 
-      // Inject or override project name with auto-detected value
+      // Check if project name is already provided in the request
+      if (body && typeof body === 'object' && 'projectName' in body && body.projectName) {
+        projectName = body.projectName as string;
+      } else {
+        // Use workingDirectory parameter if provided for project detection
+        const workingDirectory = body && typeof body === 'object' && 'workingDirectory' in body
+          ? body.workingDirectory as string
+          : undefined;
+
+        console.log(`[MCP-ADAPTER] Request body:`, JSON.stringify(body));
+        console.log(`[MCP-ADAPTER] Extracted workingDirectory: "${workingDirectory}"`);
+
+        // Create MCP context with working directory
+        const mcpContext = workingDirectory ? { workingDirectory } : request;
+        console.log(`[MCP-ADAPTER] MCP context:`, JSON.stringify(mcpContext));
+        projectName = await detectProjectForMCP(mcpContext);
+      }
+
+      // Inject or override project name with detected value
       body = {
         ...(body || {}),
         projectName
