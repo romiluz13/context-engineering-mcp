@@ -701,12 +701,29 @@ export async function detectProjectForMCP(mcpContext?: any): Promise<string> {
     return detection.projectName;
 
   } catch (error) {
-    console.error('[UNIVERSAL-PROJECT-DETECTION] Error:', error);
+    console.error('[MCP-PROJECT-DETECTION] Error in detectProjectForMCP:', error);
 
-    // Emergency fallback
-    const fallback = `project-${Date.now().toString(36)}`;
-    console.log(`[UNIVERSAL-PROJECT-DETECTION] Emergency fallback: "${fallback}"`);
+    // BETTER FALLBACK: Try to get project name from working directory path
+    try {
+      const mcpWorkingDir = process.env.MCP_WORKING_DIRECTORY ||
+                           mcpContext?.workingDirectory ||
+                           process.cwd();
 
+      // Extract project name from path as last resort
+      const pathParts = mcpWorkingDir.split('/').filter(Boolean);
+      const lastPart = pathParts[pathParts.length - 1];
+
+      if (lastPart && lastPart !== '.' && lastPart !== '..') {
+        console.log(`[MCP-PROJECT-DETECTION] Using directory name as fallback: "${lastPart}"`);
+        return lastPart;
+      }
+    } catch (fallbackError) {
+      console.error('[MCP-PROJECT-DETECTION] Fallback also failed:', fallbackError);
+    }
+
+    // LAST RESORT: Use a consistent fallback instead of random
+    const fallback = 'unknown-project';
+    console.log(`[MCP-PROJECT-DETECTION] Using last resort fallback: "${fallback}"`);
     return fallback;
   }
 }

@@ -93,15 +93,23 @@ export async function setupMemoryBankSystem(workingDirectory: string = process.c
   console.log('-------------------------------------');
 
   try {
-    const projectName = await detectProjectForMCP({ workingDirectory });
+    // Use the more robust detectProjectFromPath directly with working directory
+    const detection = (await import('../../../shared/utils/project-name-normalizer.js')).detectProjectFromPath(workingDirectory);
+
     result.details.projectDetection = {
       success: true,
-      projectName: projectName,
+      projectName: detection.projectName,
       workingDirectory: workingDirectory,
-      confidence: 90, // detectProjectForMCP doesn't return confidence, assume high
-      message: `✅ Project detected: "${projectName}"`
+      confidence: detection.confidence,
+      message: `✅ Project detected: "${detection.projectName}" (${detection.detectionMethod}, ${detection.confidence}% confidence)`
     };
     console.log(result.details.projectDetection.message);
+    console.log(`🔍 Project Detection Details:`, {
+      workingDirectory,
+      projectName: detection.projectName,
+      method: detection.detectionMethod,
+      confidence: detection.confidence
+    });
   } catch (error: any) {
     result.details.projectDetection.message = `❌ Project detection failed: ${error.message}`;
     console.log(result.details.projectDetection.message);
