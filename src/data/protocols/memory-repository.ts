@@ -1,4 +1,4 @@
-import { Memory, MemorySearchResult, MemorySearchParams, StructuredMemory, MemoryType, MemoryValidationResult } from "../../domain/entities/index.js";
+import { Memory, MemorySearchResult, MemorySearchParams, MemoryType, StructuredMemory, MemoryValidationResult } from "../../domain/entities/index.js";
 
 export interface MemoryRepository {
   // Core CRUD operations
@@ -24,9 +24,12 @@ export interface MemoryRepository {
     lastActivity: Date;
   }>;
 
-  // NEW: Structured template methods (backward compatible extensions)
-  storeStructured(memory: StructuredMemory): Promise<Memory>;
+  // 🎯 AI-OPTIMIZED: Enhanced methods for better context discovery
+  searchByTags(tags: string[], projectName?: string, limit?: number): Promise<Memory[]>;
   searchByType(memoryType: MemoryType, projectName: string, limit?: number): Promise<Memory[]>;
+
+  // Backward compatibility - minimal implementations for existing code
+  storeStructured(memory: StructuredMemory): Promise<Memory>;
   getRelatedMemories(fileName: string, projectName: string, limit?: number): Promise<MemorySearchResult[]>;
   validateTemplate(content: string, memoryType: MemoryType, fileName: string): Promise<MemoryValidationResult>;
   generateTemplateContent(memoryType: MemoryType, projectName?: string): string;

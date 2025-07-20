@@ -242,7 +242,9 @@ describe("MCP Tools Integration Tests", () => {
       expect(response.body.projectName).toBe("test-project");
       expect(response.body.fileName).toBe("test-file.md");
       expect(response.body.content).toBe("Test content for loading");
-      expect(response.body.tags).toEqual(["test"]);
+      // AI-enhanced tagging generates more intelligent tags
+      expect(response.body.tags).toContain("test");
+      expect(response.body.tags.length).toBeGreaterThan(1);
     });
 
     test("should return 404 for non-existing memory", async () => {

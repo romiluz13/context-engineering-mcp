@@ -12,10 +12,20 @@ export interface MemoryDocument {
   // Atlas only fields
   contentVector?: number[];
   summary?: string;
-  // NEW: Structured template support (backward compatible)
+  // ENHANCED: AI-optimized metadata for superior code generation context
   memoryType?: MemoryType;
-  templateVersion?: string;
+  metadata?: {
+    aiContextType: string;
+    codeRelevance: number;
+    technicalDepth: number;
+    implementationDetails: string[];
+    errorPatterns: string[];
+    architecturalInsights: string[];
+    relatedMemories: string[];
+  };
+  // Backward compatibility
   relationships?: MemoryRelationships;
+  templateVersion?: string;
   structuredData?: Record<string, any>;
 }
 

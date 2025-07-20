@@ -9,11 +9,19 @@ export interface Memory {
   // Atlas only - vector embeddings
   contentVector?: number[];
   summary?: string;
-  // NEW: Structured template support (backward compatible)
+  // ENHANCED: AI-optimized metadata for superior code generation context
   memoryType?: MemoryType;
-  templateVersion?: string;
+  metadata?: {
+    aiContextType: string;
+    codeRelevance: number;
+    technicalDepth: number;
+    implementationDetails: string[];
+    errorPatterns: string[];
+    architecturalInsights: string[];
+    relatedMemories: string[];
+  };
+  // Backward compatibility - keep existing relationships field
   relationships?: MemoryRelationships;
-  structuredData?: Record<string, any>;
 }
 
 export interface MemorySearchResult extends Memory {
@@ -27,72 +35,40 @@ export interface MemorySearchParams {
   tags?: string[];
   limit?: number;
   useSemanticSearch?: boolean;
-  // NEW: Structured search support
+  // ENHANCED: AI-optimized search filters
   memoryType?: MemoryType;
-  includeRelationships?: boolean;
+  minCodeRelevance?: number;
+  minTechnicalDepth?: number;
 }
 
-// NEW: Structured Memory Template System
+// ENHANCED: AI-Optimized Memory Types for Superior Code Generation Context
 export type MemoryType =
-  | 'project-brief'        // Core requirements/goals
-  | 'system-patterns'      // Architecture/patterns
-  | 'tech-context'         // Tech stack/setup
-  | 'active-context'       // Current focus/decisions
-  | 'progress-tracking'    // Status/roadmap
-  | 'code-patterns'        // Code structure/conventions
-  | 'error-solutions'      // Error patterns/fixes
-  | 'implementation-rules' // AI behavior patterns (.clinerules equivalent)
-  | 'custom';              // User-defined templates
+  | 'architecture'         // System design, components, patterns
+  | 'implementation'       // Code patterns, functions, algorithms
+  | 'error-solution'       // Error patterns, debugging, fixes
+  | 'performance'          // Optimization, benchmarks, profiling
+  | 'configuration'        // Setup, deployment, environment
+  | 'testing'              // Test patterns, quality assurance
+  | 'api-integration'      // API design, endpoints, services
+  | 'database'             // Data models, queries, schemas
+  | 'security'             // Authentication, authorization, encryption
+  | 'progress'             // Status, milestones, planning
+  | 'general';             // Unclassified content
 
+// Backward compatible interfaces (keep existing functionality working)
 export interface MemoryRelationships {
-  dependsOn: string[];      // Files this memory depends on
-  influences: string[];     // Files this memory influences
-  relatedTo: string[];      // Related memories
-  hierarchyLevel: number;   // 0=foundation, 1=active, 2=tracking
+  dependsOn: string[];
+  influences: string[];
+  relatedTo: string[];
+  hierarchyLevel: number;
 }
 
+// Backward compatibility interfaces (minimal implementations)
 export interface StructuredMemory extends Memory {
   memoryType: MemoryType;
   templateVersion: string;
   relationships: MemoryRelationships;
   structuredData: Record<string, any>;
-}
-
-export interface MemoryTemplate {
-  type: MemoryType;
-  version: string;
-  name: string;
-  description: string;
-  schema: TemplateSchema;
-  defaultContent: string;
-  validationRules: ValidationRule[];
-  relationships: {
-    requiredDependencies: MemoryType[];
-    optionalDependencies: MemoryType[];
-    influences: MemoryType[];
-  };
-}
-
-export interface TemplateSchema {
-  sections: TemplateSection[];
-  requiredFields: string[];
-  optionalFields: string[];
-}
-
-export interface TemplateSection {
-  name: string;
-  description: string;
-  required: boolean;
-  format: 'markdown' | 'yaml' | 'json' | 'text';
-  placeholder?: string;
-  validation?: string; // regex pattern
-}
-
-export interface ValidationRule {
-  field: string;
-  rule: 'required' | 'minLength' | 'maxLength' | 'pattern' | 'custom';
-  value?: any;
-  message: string;
 }
 
 export interface MemoryValidationResult {
@@ -113,3 +89,5 @@ export interface ValidationWarning {
   message: string;
   suggestion?: string;
 }
+
+// Clean, focused interfaces for AI-optimized memory bank
