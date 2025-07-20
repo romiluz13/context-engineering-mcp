@@ -170,22 +170,37 @@ export async function setupMemoryBankSystem(workingDirectory: string = process.c
     const isAvailable = embeddingService.isAvailable();
 
     let testEmbedding = false;
+    let apiConnectionTest = null;
+
     if (isAvailable) {
-      const testResult = await embeddingService.generateEmbedding('test content for setup validation');
-      testEmbedding = !!testResult;
+      // Test API connection first
+      apiConnectionTest = await embeddingService.testApiConnection();
+
+      if (apiConnectionTest.success) {
+        // If API connection works, test actual embedding generation
+        const testResult = await embeddingService.generateEmbedding('test content for setup validation');
+        testEmbedding = !!testResult;
+      }
     }
 
     result.details.vectorStorage = {
       success: isAvailable && testEmbedding,
       embeddingServiceAvailable: isAvailable,
       testEmbedding,
-      message: `Embedding Service: ${isAvailable ? '✅' : '❌'}, Test Embedding: ${testEmbedding ? '✅' : '❌'}`
+      message: `Embedding Service: ${isAvailable ? '✅' : '❌'}, API Connection: ${apiConnectionTest?.success ? '✅' : '❌'}, Test Embedding: ${testEmbedding ? '✅' : '❌'}`
     };
 
     console.log(result.details.vectorStorage.message);
 
+    if (apiConnectionTest && !apiConnectionTest.success) {
+      console.log('🚨 API Connection Details:', apiConnectionTest);
+    }
+
     if (!result.details.vectorStorage.success) {
       if (!isAvailable) result.recommendations.push('Fix environment variables for vector search');
+      if (apiConnectionTest && !apiConnectionTest.success) {
+        result.recommendations.push(`Voyage AI API Error: ${apiConnectionTest.error}`);
+      }
       if (!testEmbedding) result.recommendations.push('Check Voyage AI API key and connectivity');
     }
   } catch (error: any) {
