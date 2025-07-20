@@ -1,63 +1,84 @@
 # MongoDB Memory Bank MCP Server
 
-🚀 **The world's first MongoDB-powered MCP server with hybrid search capabilities**
-
-Transform your AI coding workflow with lightning-fast memory management, semantic search, and MongoDB's cutting-edge $rankFusion technology.
+A Model Context Protocol (MCP) server that provides persistent memory storage using MongoDB as the backend. This allows AI assistants to store, retrieve, and search through project-specific documentation and notes across sessions.
 
 [![npm version](https://badge.fury.io/js/mongodb-memory-bank-mcp.svg)](https://www.npmjs.com/package/mongodb-memory-bank-mcp)
 [![npm downloads](https://img.shields.io/npm/dm/mongodb-memory-bank-mcp.svg)](https://www.npmjs.com/package/mongodb-memory-bank-mcp)
 
-## ⚡ Game-Changing Features
+## What This Does
 
-### 🔥 **MongoDB $rankFusion Hybrid Search** (8.1+)
-- **World's first MCP implementation** of MongoDB's revolutionary $rankFusion
-- **Combines text + vector search** in a single query using reciprocal rank fusion
-- **10-100x faster** than traditional file-based memory systems
-- **Semantic understanding** with Voyage AI's state-of-the-art embeddings
+This MCP server enables AI assistants to:
+- Store and retrieve project documentation and notes
+- Automatically organize memories by project with complete isolation
+- Search through stored content using text search or semantic search (Atlas only)
+- Maintain structured documentation templates (like projectbrief.md, activecontext.md)
+- Auto-generate missing template files when needed
 
-### 🎯 **Intelligent Memory Management**
-- **Auto-tagging** with AI-powered content analysis
-- **Related memory discovery** finds connections you never knew existed
-- **Sub-second search** across thousands of memories
-- **Rich metadata** with word counts, timestamps, and analytics
+## Key Features
 
-### 🌟 **Dual-Mode Architecture**
-- **Atlas Mode**: Full hybrid search with vector embeddings
-- **Community Mode**: Lightning-fast text search and document storage
-- **Seamless fallback** ensures compatibility across MongoDB versions
+### MongoDB Backend
+- Uses MongoDB for reliable, scalable storage
+- Supports both MongoDB Atlas (cloud) and Community Edition (local)
+- Automatic project detection and isolation
+- Fast text search with MongoDB's text indexes
 
-## 🚀 Quick Start
+### Template Intelligence
+- Automatically detects common documentation patterns (projectbrief.md, activecontext.md, etc.)
+- Creates missing foundation files when dependencies are detected
+- Maintains relationships between different types of documentation
 
-### Installation
+### Search Capabilities
+- **MongoDB Community**: Fast text search across all stored content
+- **MongoDB Atlas**: Hybrid search combining text and semantic search using vector embeddings
+- Related memory discovery based on content similarity and tags
+
+## Installation
 
 ```bash
 npm install -g mongodb-memory-bank-mcp
 ```
 
-### Atlas Setup (Recommended - Full Features)
+## Setup
 
-```bash
-# Interactive setup with MongoDB Atlas
-npx mongodb-memory-bank-mcp setup:atlas
+### Option 1: MongoDB Atlas (Recommended)
+Provides full features including semantic search with vector embeddings.
+
+1. Create a MongoDB Atlas cluster (free tier available)
+2. Get your connection string from Atlas
+3. Sign up for Voyage AI API key for embeddings
+4. Configure environment variables (see Configuration section)
+
+### Option 2: Local MongoDB Community
+Provides core functionality with text search.
+
+1. Install and start MongoDB Community Edition locally
+2. Use connection string: `mongodb://localhost:27017`
+3. Configure environment variables (see Configuration section)
+
+## Configuration
+
+### Environment Variables
+
+```env
+# Required
+MONGODB_URI=mongodb://localhost:27017  # or your Atlas connection string
+MONGODB_DATABASE=memory_bank
+
+# Optional - for Atlas semantic search
+MONGODB_ATLAS=true
+ENABLE_VECTOR_SEARCH=true
+VOYAGE_API_KEY=your_voyage_api_key
 ```
 
-### Local Setup (Community Edition)
+### MCP Client Setup
 
-```bash
-# Quick local setup with MongoDB Community
-npx mongodb-memory-bank-mcp setup:local
-```
-
-## 🛠 MCP Client Configuration
-
-### Claude Desktop
-
+#### Claude Desktop
 Add to your `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
-    "memory-bank-mongodb": {
+    "memory-bank": {
       "command": "npx",
       "args": ["-y", "mongodb-memory-bank-mcp"],
       "env": {
@@ -70,164 +91,123 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-### Cursor / Windsurf / VS Code
+#### Other MCP Clients
+Use the same environment variables in your MCP client configuration.
 
-Configure in your MCP settings with the same environment variables.
+## Available MCP Tools
 
-## 🎯 MCP Tools
+### Core Operations
+- `list_projects` - List all projects in the memory bank
+- `list_project_files` - List all files within a specific project
+- `memory_bank_read` - Read the content of a specific memory file
+- `memory_bank_write` - Create or update a memory file
+- `memory_search` - Search across all memories with text or semantic search
 
-### Core Memory Operations
-- `list_projects` - List all projects
-- `list_project_files` - List files in a project  
-- `memory_bank_read` - Read memory content
-- `memory_bank_write` - Create new memory
-- `memory_bank_update` - Update existing memory
+### Advanced Features
+- `memory_discover` - Find memories related to a specific file
+- `detect_project_context_secure_mongodb-memory-bank` - Detect current project context
 
-### Enhanced MongoDB Features
-- `memory_search` - Hybrid text/semantic search
-- `memory_discover` - Find related memories
+## How It Works
 
-## 💡 Usage Examples
+### Automatic Project Detection
+The server automatically detects which project you're working on based on:
+- Current working directory
+- Git repository information
+- Package.json or other project files
+- Directory structure patterns
 
-### Store with Auto-Tagging
-```
-Store this authentication strategy:
-"JWT implementation with refresh tokens, Redis session store, rate limiting, and brute force protection."
-```
-**Result**: Automatically tagged with `auth`, `jwt`, `security`, `redis`, `performance`
+Each project's memories are completely isolated from others.
 
-### Hybrid Search (Atlas)
-```
-Search for "database performance optimization" using semantic search
-```
-**Result**: Finds related memories about indexing, query optimization, caching strategies
+### Template Intelligence
+When you create common documentation files, the system automatically:
+- Detects the template type (project brief, active context, system patterns, etc.)
+- Creates missing foundation files if needed
+- Establishes relationships between related files
+- Applies appropriate tags and metadata
 
-### Discover Related Memories
-```
-Find memories related to my auth-strategy.md file
-```
-**Result**: Discovers security patterns, session management, and API design memories
+### Example Workflow
+1. Create `projectbrief.md` - System detects this as a project brief template
+2. Create `activecontext.md` - System automatically creates missing `systempatterns.md` and `techcontext.md` if they don't exist
+3. Update `activecontext.md` - System can automatically update `progress.md` based on changes
+4. Search for "authentication" - System searches across all project files and finds relevant content
 
-## 🏗 Architecture
+## Architecture
 
-### MongoDB-First Design
-- **Single source of truth**: All data in MongoDB
-- **ACID transactions**: Data consistency guaranteed
-- **Horizontal scaling**: Grows with your needs
-- **Rich indexing**: Optimized for search performance
+### Storage
+- All memories stored in MongoDB collections
+- Each project gets isolated storage
+- Automatic indexing for fast text search
+- Optional vector embeddings for semantic search (Atlas only)
 
-### Performance Benchmarks
+### Performance
+- Text search: ~50-200ms for thousands of documents
+- Memory retrieval: ~10-50ms per document
+- Semantic search: ~50-150ms (Atlas with vector search)
+- Concurrent access supported
 
-| Operation | File-Based | MongoDB Community | MongoDB Atlas |
-|-----------|------------|-------------------|---------------|
-| Text Search | 2-5 seconds | 50-200ms | 30-100ms |
-| Memory Load | 1-3 seconds | 10-50ms | 5-20ms |
-| Related Discovery | ❌ Not available | 100-300ms | 50-150ms |
-| Semantic Search | ❌ Not available | ❌ Not available | 50-150ms |
+### Data Structure
+Each memory document contains:
+- Project name and file name
+- Content and metadata (word count, timestamps)
+- Auto-generated tags
+- Template type and relationships (if applicable)
+- Vector embeddings (Atlas only)
 
-## 🔧 Configuration
+## Why MongoDB Instead of Files?
 
-### Environment Variables
+### Performance
+- Fast indexed search instead of scanning files
+- Concurrent access without file locking issues
+- Efficient storage and retrieval at scale
+- Rich query capabilities beyond simple text matching
 
-```env
-# Required
-MONGODB_URI=mongodb://localhost:27017
-MONGODB_DATABASE=memory_bank
+### Reliability
+- ACID transactions ensure data consistency
+- Automatic backup and replication (Atlas)
+- No file corruption or permission issues
+- Built-in connection pooling and error handling
 
-# Atlas Features (Optional)
-MONGODB_ATLAS=true
-ENABLE_VECTOR_SEARCH=true
-VOYAGE_API_KEY=your_voyage_api_key
-```
+### Features
+- Text search with relevance scoring
+- Semantic search with vector embeddings (Atlas)
+- Complex queries and aggregations
+- Real-time indexing and updates
 
-### MongoDB Atlas Setup
+## Use Cases
 
-1. **Create Atlas Cluster** (Free tier available)
-2. **Enable Vector Search** in cluster settings
-3. **Get Voyage AI API Key** for embeddings
-4. **Configure connection string** with credentials
-
-### MongoDB Community Setup
-
-1. **Install MongoDB Community** locally
-2. **Start MongoDB service**
-3. **Use local connection string**
-4. **Enjoy core features** without vector search
-
-## 🌟 Why MongoDB Over Files?
-
-### Performance Revolution
-- **Instant search** vs slow file scanning
-- **Concurrent access** vs file locking
-- **Rich queries** vs basic grep
-- **Scalable storage** vs linear degradation
-
-### Advanced Capabilities
-- **$rankFusion hybrid search** (MongoDB 8.1+)
-- **Vector embeddings** with Voyage AI
-- **Aggregation pipelines** for complex analytics
-- **Real-time indexing** for optimal performance
-
-### Developer Experience
-- **Drop-in replacement** for existing memory banks
-- **Backward compatibility** with all original tools
-- **Enhanced features** without breaking changes
-- **Production-ready** with enterprise-grade reliability
-
-## 🚀 Latest Technologies
-
-### MongoDB $rankFusion (8.1+)
-- **Reciprocal rank fusion** algorithm
-- **Weighted search results** for optimal relevance
-- **Multiple search methods** combined intelligently
-- **Automatic fallback** for older MongoDB versions
-
-### Voyage AI Integration
-- **voyage-3-large** - Latest state-of-the-art model
-- **32K token context** vs OpenAI's 8K
-- **Multilingual support** across 26 languages
-- **Quantization support** for cost optimization
-
-## 📊 Use Cases
-
-### AI Development
-- **Code patterns** and architecture decisions
-- **Bug fixes** and debugging strategies  
-- **API designs** and integration patterns
-- **Performance optimizations** and best practices
+### Development Documentation
+- Project requirements and architecture decisions
+- Code patterns and implementation notes
+- Bug fixes and troubleshooting guides
+- API documentation and integration patterns
 
 ### Knowledge Management
-- **Meeting notes** and team decisions
-- **Research findings** and technical insights
-- **Learning notes** and skill development
-- **Project documentation** and requirements
+- Meeting notes and team decisions
+- Research findings and technical insights
+- Learning notes and skill development
+- Best practices and coding standards
 
-### Team Collaboration
-- **Shared knowledge base** across team members
-- **Decision tracking** and reasoning documentation
-- **Best practices** and coding standards
-- **Troubleshooting guides** and solutions
+### AI Assistant Memory
+- Persistent context across sessions
+- Project-specific knowledge retention
+- Automatic organization and tagging
+- Intelligent content relationships
 
-## 🔒 Security & Reliability
+## Security
 
-- **Input validation** and sanitization
-- **Path security** validation
-- **MongoDB injection** prevention
-- **Connection pooling** for high availability
-- **Automatic indexing** for performance
-- **ACID transactions** for data integrity
+- Input validation and sanitization on all operations
+- Path security validation to prevent directory traversal
+- MongoDB injection prevention
+- Secure connection handling with proper error management
 
-## 📈 Roadmap
+## Requirements
 
-- [ ] **Multi-tenant support** for team deployments
-- [ ] **Real-time collaboration** features
-- [ ] **Advanced analytics** dashboard
-- [ ] **Custom embedding models** support
-- [ ] **GraphQL API** for advanced integrations
+- Node.js 18+
+- MongoDB Community Edition 4.4+ or MongoDB Atlas
+- For semantic search: MongoDB Atlas with vector search enabled
+- For embeddings: Voyage AI API key
 
-## 🤝 Contributing
-
-We welcome contributions! This project follows MongoDB and MCP best practices.
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -235,17 +215,12 @@ We welcome contributions! This project follows MongoDB and MCP best practices.
 4. Ensure all tests pass
 5. Submit a pull request
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Dependencies
 
-Built with cutting-edge technologies:
-- **MongoDB** - The developer data platform
-- **Voyage AI** - State-of-the-art embeddings
-- **Model Context Protocol** - AI tool integration standard
-
----
-
-**Transform your AI coding workflow today with MongoDB's power! 🚀**
+- **MongoDB**: Database backend
+- **Voyage AI**: Vector embeddings for semantic search (Atlas only)
+- **Model Context Protocol**: AI tool integration standard
