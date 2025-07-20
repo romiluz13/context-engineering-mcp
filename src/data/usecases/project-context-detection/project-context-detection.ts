@@ -433,7 +433,8 @@ export class ProjectContextDetection implements ProjectContextDetectionUseCase {
 
   /**
    * Smart fallback when normal project detection fails
-   * Checks existing projects in MongoDB and provides intelligent selection
+   * REMOVED: Auto-selection logic that breaks project isolation
+   * The system must ALWAYS respect the working directory context
    */
   private async smartProjectFallback(workingDirectory: string): Promise<{ name: string; confidence: number; method: string } | null> {
     try {
@@ -444,22 +445,11 @@ export class ProjectContextDetection implements ProjectContextDetectionUseCase {
         return null;
       }
 
-      if (existingProjects.length === 1) {
-        // Only one project exists - use it automatically with high confidence
-        return {
-          name: existingProjects[0],
-          confidence: 90,
-          method: 'single-project-fallback'
-        };
-      }
+      // REMOVED: Auto-selection of existing projects - this breaks project isolation!
+      // The system must ALWAYS respect the working directory, not auto-select existing projects
 
-      // Multiple projects exist - use most recently accessed project with medium confidence
-      const mostRecentProject = existingProjects[0]; // Already sorted by lastAccessed DESC
-      return {
-        name: mostRecentProject,
-        confidence: 75,
-        method: 'recent-project-fallback'
-      };
+      // Return null to force directory-based detection
+      return null;
 
     } catch (error) {
       console.error('[SMART-FALLBACK] Error accessing existing projects:', error);

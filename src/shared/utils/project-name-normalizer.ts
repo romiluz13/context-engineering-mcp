@@ -572,18 +572,17 @@ function generateSmartDefault(workingDirectory: string): ProjectSignal {
       };
     }
 
-    // Strategy 2: Generate unique name based on path and timestamp
+    // Strategy 2: Generate name based on path only (NO DATE-BASED NAMING)
     const pathHash = workingDirectory.split('/').slice(-2).join('-');
-    const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const username = os.userInfo().username || 'user';
 
-    const fallbackName = `project-${pathHash}-${timestamp}-${username}`;
+    const fallbackName = `project-${pathHash}-${username}`;
 
     return {
       type: 'smart-default',
       confidence: 50,
       projectName: normalizeProjectName(fallbackName),
-      evidence: [`Generated from path: ${workingDirectory}`, `Timestamp: ${timestamp}`]
+      evidence: [`Generated from path: ${workingDirectory}`, `User: ${username}`]
     };
 
   } catch (error) {
@@ -615,11 +614,8 @@ async function smartProjectFallback(workingDirectory: string, existingSignals: P
       return null;
     }
 
-    // REMOVED: Auto-selection of single project - this breaks project isolation!
+    // REMOVED: All auto-selection logic - this breaks project isolation!
     // The system must ALWAYS respect the working directory, not auto-select existing projects
-
-    // REMOVED: Auto-selection of most recent project - this breaks project isolation!
-    // The system must ALWAYS respect the working directory and create new projects as needed
 
     // Return null to force directory-based detection
     return null;
@@ -675,24 +671,32 @@ export function getCachedProjectName(): string | null {
 
 /**
  * Enhanced project detection for MCP environments
- * SIMPLIFIED: Always use directory-based detection, no auto-selection
+ * FIXED: Use cached project name from detect_project_context_secure first, then fallback
  */
 export async function detectProjectForMCP(mcpContext?: any): Promise<string> {
   try {
-    // SIMPLIFIED APPROACH: Always use directory-based detection
-    // No more auto-selection or caching - this ensures predictable behavior
+    // PRIORITY 1: Use cached project name if available (from detect_project_context_secure)
+    const cachedProject = getCachedProjectName();
+    if (cachedProject) {
+      console.log(`[MCP-PROJECT-DETECTION] Using cached project: "${cachedProject}"`);
+      return cachedProject;
+    }
+
+    // PRIORITY 2: Use workingDirectory if provided
     const mcpWorkingDir = process.env.MCP_WORKING_DIRECTORY ||
                          mcpContext?.workingDirectory ||
                          process.cwd();
 
-    const detection = await detectProjectUniversally(mcpWorkingDir);
+    // Use the same logic as detectProjectFromPath (which works correctly)
+    const detection = detectProjectFromPath(mcpWorkingDir);
 
     // Log detection for debugging
-    console.log(`[UNIVERSAL-PROJECT-DETECTION] process.cwd(): ${process.cwd()}`);
-    console.log(`[UNIVERSAL-PROJECT-DETECTION] MCP_WORKING_DIRECTORY: ${process.env.MCP_WORKING_DIRECTORY || 'undefined'}`);
-    console.log(`[UNIVERSAL-PROJECT-DETECTION] mcpContext?.workingDirectory: ${mcpContext?.workingDirectory || 'undefined'}`);
-    console.log(`[UNIVERSAL-PROJECT-DETECTION] Final Working Dir: ${mcpWorkingDir}`);
-    console.log(`[UNIVERSAL-PROJECT-DETECTION] Method: ${detection.detectionMethod}, Confidence: ${detection.confidence}%, Project: "${detection.projectName}"`);
+    console.log(`[MCP-PROJECT-DETECTION] No cached project, detecting from directory`);
+    console.log(`[MCP-PROJECT-DETECTION] process.cwd(): ${process.cwd()}`);
+    console.log(`[MCP-PROJECT-DETECTION] MCP_WORKING_DIRECTORY: ${process.env.MCP_WORKING_DIRECTORY || 'undefined'}`);
+    console.log(`[MCP-PROJECT-DETECTION] mcpContext?.workingDirectory: ${mcpContext?.workingDirectory || 'undefined'}`);
+    console.log(`[MCP-PROJECT-DETECTION] Final Working Dir: ${mcpWorkingDir}`);
+    console.log(`[MCP-PROJECT-DETECTION] Method: ${detection.detectionMethod}, Confidence: ${detection.confidence}%, Project: "${detection.projectName}"`);
 
     return detection.projectName;
 
