@@ -97,7 +97,9 @@ export class ProjectContextDetection implements ProjectContextDetectionUseCase {
           context.orgName = urlMatch[1];
           context.repoName = urlMatch[2];
         }
-      } catch {}
+      } catch (err) {
+        // Git remote not available or git not installed - this is expected
+      }
 
       try {
         // Get current branch
@@ -105,7 +107,9 @@ export class ProjectContextDetection implements ProjectContextDetectionUseCase {
           cwd: workingDirectory, 
           encoding: 'utf8' 
         }).trim();
-      } catch {}
+      } catch (err) {
+        // Git branch detection failed - this is expected
+      }
 
       try {
         // Get last commit
@@ -113,7 +117,9 @@ export class ProjectContextDetection implements ProjectContextDetectionUseCase {
           cwd: workingDirectory, 
           encoding: 'utf8' 
         }).trim().substring(0, 8);
-      } catch {}
+      } catch (err) {
+        // Git commit detection failed - this is expected
+      }
 
       return context;
     } catch {
@@ -156,7 +162,9 @@ export class ProjectContextDetection implements ProjectContextDetectionUseCase {
         else if (deps.next) context.framework = 'Next.js';
         else if (deps.express) context.framework = 'Express';
         else if (deps.fastify) context.framework = 'Fastify';
-      } catch {}
+      } catch (err) {
+        // Package.json parsing failed - this is expected
+      }
     }
 
     if (context.hasCargoToml) {
@@ -165,7 +173,9 @@ export class ProjectContextDetection implements ProjectContextDetectionUseCase {
         const cargoToml = await fs.readFile(path.join(workingDirectory, 'Cargo.toml'), 'utf8');
         const nameMatch = cargoToml.match(/name\s*=\s*"([^"]+)"/);
         if (nameMatch) context.packageName = nameMatch[1];
-      } catch {}
+      } catch (err) {
+        // Cargo.toml parsing failed - this is expected
+      }
     }
 
     if (context.hasGoMod) {
@@ -177,7 +187,9 @@ export class ProjectContextDetection implements ProjectContextDetectionUseCase {
           const modulePath = moduleMatch[1];
           context.packageName = modulePath.split('/').pop();
         }
-      } catch {}
+      } catch (err) {
+        // go.mod parsing failed - this is expected
+      }
     }
 
     if (context.hasRequirementsTxt || context.hasPyprojectToml) {
@@ -187,7 +199,9 @@ export class ProjectContextDetection implements ProjectContextDetectionUseCase {
           const pyproject = await fs.readFile(path.join(workingDirectory, 'pyproject.toml'), 'utf8');
           const nameMatch = pyproject.match(/name\s*=\s*"([^"]+)"/);
           if (nameMatch) context.packageName = nameMatch[1];
-        } catch {}
+        } catch (err) {
+          // pyproject.toml parsing failed - this is expected
+        }
       }
     }
 
@@ -198,7 +212,9 @@ export class ProjectContextDetection implements ProjectContextDetectionUseCase {
           await fs.readFile(path.join(workingDirectory, 'composer.json'), 'utf8')
         );
         context.packageName = composerJson.name;
-      } catch {}
+      } catch (err) {
+        // composer.json parsing failed - this is expected
+      }
     }
 
     return context;
@@ -241,7 +257,9 @@ export class ProjectContextDetection implements ProjectContextDetectionUseCase {
           if (entry.name === '.vscode') context.hasVscode = true;
         }
       }
-    } catch {}
+    } catch (err) {
+      // Directory reading failed - this is expected
+    }
 
     return context;
   }
@@ -409,7 +427,8 @@ export class ProjectContextDetection implements ProjectContextDetectionUseCase {
     try {
       const existingProjects = await this.getExistingProjects();
       return existingProjects.includes(projectName);
-    } catch {
+    } catch (err) {
+      // Project list access failed - this is expected
       return false;
     }
   }
@@ -417,7 +436,8 @@ export class ProjectContextDetection implements ProjectContextDetectionUseCase {
   async getExistingProjects(): Promise<string[]> {
     try {
       return await this.projectRepository.listProjects();
-    } catch {
+    } catch (err) {
+      // Project repository access failed - this is expected  
       return [];
     }
   }
@@ -426,7 +446,8 @@ export class ProjectContextDetection implements ProjectContextDetectionUseCase {
     try {
       await fs.access(filePath);
       return true;
-    } catch {
+    } catch (err) {
+      // File access check failed - this is expected
       return false;
     }
   }

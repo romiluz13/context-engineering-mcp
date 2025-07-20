@@ -7,6 +7,7 @@ import { makeMongoDBListProjectsController } from "../../factories/controllers/m
 import { makeMongoDBListProjectFilesController } from "../../factories/controllers/mongodb-list-project-files/mongodb-list-project-files-controller-factory.js";
 import { makeMongoDBUpdateController } from "../../factories/controllers/mongodb-update/mongodb-update-controller-factory.js";
 import { makeProjectContextDetectionController } from "../../factories/controllers/project-context-detection/project-context-detection-controller-factory.js";
+import { setupMemoryBankSystem } from "../../../presentation/mcp/tools/create-vector-search-index.js";
 
 // Clean, focused imports - no unused template controllers
 
@@ -227,7 +228,46 @@ export default () => {
     handler: adaptUniversalMcpRequestHandler(makeMemoryDiscoverController()),
   });
 
-
+  // ✅ NEW: Complete Memory Bank System Setup Tool
+  router.setTool({
+    schema: {
+      name: "setup_memory_bank_system",
+      description: "Complete system setup: project detection, environment validation, vector index creation, and health check",
+      inputSchema: {
+        type: "object",
+        properties: {
+          workingDirectory: {
+            type: "string",
+            description: "Working directory for project detection (defaults to current directory)",
+            default: "."
+          }
+        },
+        required: []
+      }
+    },
+    handler: adaptMcpRequestHandler({
+      handle: async (request: any) => {
+        try {
+          const workingDirectory = request.workingDirectory || process.cwd();
+          const result = await setupMemoryBankSystem(workingDirectory);
+          return {
+            statusCode: 200,
+            body: result
+          };
+        } catch (error: any) {
+          return {
+            statusCode: 500,
+            body: {
+              success: false,
+              message: `Setup failed: ${error.message}`,
+              details: {},
+              recommendations: ['Check system logs for detailed error information']
+            }
+          };
+        }
+      }
+    })
+  });
 
   // Clean, focused MCP tools - no unused template controllers
 

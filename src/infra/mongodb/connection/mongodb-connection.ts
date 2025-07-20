@@ -79,15 +79,42 @@ export class MongoDBConnection {
       tags: 'text'
     });
 
-    // Vector search index for Atlas deployments (if enabled)
+    // ✅ FIXED: Create proper Atlas Vector Search Index (not 2dsphere)
     if (mongoConfig.isAtlas && mongoConfig.enableVectorSearch) {
       try {
-        await memoriesCollection.createIndex({
-          contentVector: "2dsphere"
+        console.log('🔍 Creating Atlas Vector Search Index...');
+
+        // ✅ CORRECT: Use createSearchIndex method from official docs
+        const result = await memoriesCollection.createSearchIndex({
+          name: "vector_index",
+          type: "vectorSearch",
+          definition: {
+            "fields": [
+              {
+                "type": "vector",
+                "path": "contentVector",
+                "numDimensions": 1024,
+                "similarity": "cosine"
+              },
+              {
+                "type": "filter",
+                "path": "projectName"
+              }
+            ]
+          }
         });
-        console.log('Vector search index created for Atlas deployment');
-      } catch (error) {
-        console.warn('Vector search index creation failed (this is normal for Community deployments):', error);
+
+        console.log('✅ Atlas Vector Search Index created successfully:', result);
+      } catch (error: any) {
+        if (error.message.includes('already exists') || error.message.includes('duplicate')) {
+          console.log('ℹ️  Atlas Vector Search Index already exists');
+        } else {
+          console.warn('⚠️  Atlas Vector Search Index creation failed:', {
+            message: error.message,
+            code: error.code
+          });
+          console.warn('This is expected for Community deployments or insufficient permissions');
+        }
       }
     }
 

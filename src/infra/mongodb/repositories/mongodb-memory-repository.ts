@@ -26,13 +26,35 @@ export class MongoDBMemoryRepository implements MemoryRepository {
 
   async store(memory: Memory): Promise<Memory> {
     await this.ensureConnection();
+
     // Generate embedding for Atlas deployments
     let contentVector = memory.contentVector;
+
+    console.log('🔍 Vector Storage Debug:', {
+      embeddingServiceAvailable: this.embeddingService.isAvailable(),
+      hasExistingVector: !!contentVector,
+      contentLength: memory.content.length,
+      fileName: memory.fileName
+    });
+
     if (this.embeddingService.isAvailable() && !contentVector) {
+      console.log('🚀 Generating embedding for:', memory.fileName);
       const embeddingResult = await this.embeddingService.generateEmbedding(memory.content);
       if (embeddingResult) {
         contentVector = embeddingResult.embedding;
+        console.log('✅ Embedding generated successfully:', {
+          dimensions: contentVector.length,
+          tokens: embeddingResult.tokens,
+          fileName: memory.fileName
+        });
+      } else {
+        console.log('❌ Embedding generation failed for:', memory.fileName);
       }
+    } else {
+      console.log('⏭️  Skipping embedding generation:', {
+        isAvailable: this.embeddingService.isAvailable(),
+        hasExisting: !!contentVector
+      });
     }
 
     const doc: MemoryDocument = {
@@ -42,9 +64,15 @@ export class MongoDBMemoryRepository implements MemoryRepository {
       tags: memory.tags,
       lastModified: new Date(),
       wordCount: this.countWords(memory.content),
-      contentVector,
+      contentVector, // This should now be populated if everything works
       summary: memory.summary
     };
+
+    console.log('💾 Storing memory with vector:', {
+      fileName: memory.fileName,
+      hasVector: !!doc.contentVector,
+      vectorDimensions: doc.contentVector?.length || 0
+    });
 
     const result = await this.collection!.replaceOne(
       { projectName: memory.projectName, fileName: memory.fileName },
