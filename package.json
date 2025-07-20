@@ -1,7 +1,7 @@
 {
   "name": "mongodb-memory-bank-mcp",
-  "version": "1.2.2",
-  "description": "MCP server for remote management of project memory banks with MongoDB backend",
+  "version": "1.5.0",
+  "description": "Intelligent MCP memory bank with Cline-style template auto-detection, MongoDB hybrid search, and universal project isolation. Same simple tools, infinite intelligence.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/romiluz13/context-engineering-mcp.git"
@@ -13,8 +13,16 @@
     "project-management",
     "documentation",
     "cline",
+    "template-intelligence",
+    "auto-detection",
     "semantic-search",
-    "vector-search"
+    "vector-search",
+    "hybrid-search",
+    "path-based-detection",
+    "automatic-project-isolation",
+    "universal-detection",
+    "structured-memory",
+    "multi-signal-detection"
   ],
   "bugs": {
     "url": "https://github.com/romiluz13/context-engineering-mcp/issues"

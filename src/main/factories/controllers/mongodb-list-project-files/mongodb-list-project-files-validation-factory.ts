@@ -8,9 +8,8 @@ import { PathSecurityValidator } from "../../../../validators/path-security-vali
 
 const makeValidations = (): Validator[] => {
   return [
-    new RequiredFieldValidator("projectName"),
-    new ParamNameValidator("projectName"),
-    new PathSecurityValidator("projectName"),
+    // projectName is automatically injected by path-based adapter
+    // No validation needed for user input
   ];
 };
 

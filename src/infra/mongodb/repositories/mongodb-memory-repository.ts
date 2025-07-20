@@ -1,19 +1,23 @@
 import { Collection, Db } from 'mongodb';
-import { Memory, MemorySearchResult, MemorySearchParams } from '../../../domain/entities/index.js';
+import { Memory, MemorySearchResult, MemorySearchParams, StructuredMemory, MemoryType, MemoryValidationResult } from '../../../domain/entities/index.js';
 import { MemoryRepository } from '../../../data/protocols/memory-repository.js';
 import { MemoryDocument, MemorySearchDocument } from '../models/memory-document.js';
 import { MongoDBConnection } from '../connection/mongodb-connection.js';
 import { getCollectionNames, mongoConfig } from '../../../main/config/mongodb-config.js';
 import { VoyageEmbeddingService } from '../../ai/voyage-embedding-service.js';
+import { TemplateValidationService } from '../../../domain/services/template-validation-service.js';
+import { getTemplate, TEMPLATE_HIERARCHY } from '../../../domain/entities/memory-templates.js';
 
 export class MongoDBMemoryRepository implements MemoryRepository {
   private db?: Db;
   private collection?: Collection<MemoryDocument>;
   private embeddingService: VoyageEmbeddingService;
+  private templateValidationService: TemplateValidationService;
 
   constructor() {
     // Initialize lazily to avoid connection issues
     this.embeddingService = new VoyageEmbeddingService();
+    this.templateValidationService = new TemplateValidationService();
   }
 
   private async ensureConnection(): Promise<void> {
@@ -117,6 +121,12 @@ export class MongoDBMemoryRepository implements MemoryRepository {
       .toArray();
 
     return docs.map(doc => this.documentToMemory(doc));
+  }
+
+  async findByFileName(projectName: string, fileName: string): Promise<Memory | null> {
+    await this.ensureConnection();
+    const doc = await this.collection!.findOne({ projectName, fileName });
+    return doc ? this.documentToMemory(doc) : null;
   }
 
   async search(params: MemorySearchParams): Promise<MemorySearchResult[]> {
@@ -336,5 +346,190 @@ export class MongoDBMemoryRepository implements MemoryRepository {
 
   private countWords(content: string): number {
     return content.trim().split(/\s+/).length;
+  }
+
+  // NEW: Structured Memory Template Support
+  // These methods extend existing functionality while maintaining backward compatibility
+
+  /**
+   * Store structured memory with template validation
+   */
+  async storeStructured(memory: StructuredMemory): Promise<Memory> {
+    await this.ensureConnection();
+
+    // Validate against template
+    const validation = await this.templateValidationService.validateMemoryContent(
+      memory.content,
+      memory.memoryType,
+      memory.fileName
+    );
+
+    if (!validation.isValid) {
+      throw new Error(`Template validation failed: ${validation.errors.map(e => e.message).join(', ')}`);
+    }
+
+    // Extract structured data
+    const structuredData = this.templateValidationService.extractStructuredData(
+      memory.content,
+      memory.memoryType
+    );
+
+    // Generate embedding for Atlas deployments
+    let contentVector = memory.contentVector;
+    if (this.embeddingService.isAvailable() && !contentVector) {
+      const embeddingResult = await this.embeddingService.generateEmbedding(memory.content);
+      if (embeddingResult) {
+        contentVector = embeddingResult.embedding;
+      }
+    }
+
+    const doc: MemoryDocument = {
+      projectName: memory.projectName,
+      fileName: memory.fileName,
+      content: memory.content,
+      tags: memory.tags,
+      lastModified: new Date(),
+      wordCount: this.countWords(memory.content),
+      contentVector,
+      summary: memory.summary,
+      // Structured template fields
+      memoryType: memory.memoryType,
+      templateVersion: memory.templateVersion,
+      relationships: memory.relationships,
+      structuredData
+    };
+
+    const result = await this.collection!.replaceOne(
+      { projectName: memory.projectName, fileName: memory.fileName },
+      doc,
+      { upsert: true }
+    );
+
+    // Get the inserted/updated document with ID
+    const savedDoc = await this.collection!.findOne({
+      projectName: memory.projectName,
+      fileName: memory.fileName
+    });
+
+    return this.documentToMemory(savedDoc!);
+  }
+
+  /**
+   * Search memories by type with structure awareness
+   */
+  async searchByType(memoryType: MemoryType, projectName: string, limit = 10): Promise<Memory[]> {
+    await this.ensureConnection();
+
+    const docs = await this.collection!
+      .find({
+        projectName,
+        memoryType
+      })
+      .sort({ lastModified: -1 })
+      .limit(limit)
+      .toArray();
+
+    return docs.map(doc => this.documentToMemory(doc));
+  }
+
+  /**
+   * Get related memories based on relationships
+   */
+  async getRelatedMemories(fileName: string, projectName: string, limit = 5): Promise<MemorySearchResult[]> {
+    await this.ensureConnection();
+
+    const memory = await this.load(projectName, fileName);
+    if (!memory || !memory.relationships) {
+      return this.findRelated(projectName, fileName, limit);
+    }
+
+    // Get memories based on relationships
+    const relatedFileNames = [
+      ...memory.relationships.dependsOn,
+      ...memory.relationships.influences,
+      ...memory.relationships.relatedTo
+    ];
+
+    if (relatedFileNames.length === 0) {
+      return this.findRelated(projectName, fileName, limit);
+    }
+
+    const docs = await this.collection!
+      .find({
+        projectName,
+        fileName: { $in: relatedFileNames }
+      })
+      .sort({ lastModified: -1 })
+      .limit(limit)
+      .toArray();
+
+    return docs.map(doc => ({
+      ...this.documentToMemory(doc),
+      score: 1.0,
+      relevance: 'relationship-based'
+    }));
+  }
+
+  /**
+   * Validate memory content against template
+   */
+  async validateTemplate(content: string, memoryType: MemoryType, fileName: string): Promise<MemoryValidationResult> {
+    return this.templateValidationService.validateMemoryContent(content, memoryType, fileName);
+  }
+
+  /**
+   * Generate template content for a memory type
+   */
+  generateTemplateContent(memoryType: MemoryType, projectName?: string): string {
+    return this.templateValidationService.generateTemplateContent(memoryType, projectName);
+  }
+
+  /**
+   * Get memories by hierarchy level
+   */
+  async getMemoriesByHierarchy(projectName: string, level: number): Promise<Memory[]> {
+    await this.ensureConnection();
+
+    const memoryTypes = Object.entries(TEMPLATE_HIERARCHY)
+      .filter(([_, hierarchyLevel]) => hierarchyLevel === level)
+      .map(([type, _]) => type as MemoryType);
+
+    const docs = await this.collection!
+      .find({
+        projectName,
+        memoryType: { $in: memoryTypes }
+      })
+      .sort({ lastModified: -1 })
+      .toArray();
+
+    return docs.map(doc => this.documentToMemory(doc));
+  }
+
+  /**
+   * Get template usage statistics for a project
+   */
+  async getTemplateStats(projectName: string): Promise<Record<MemoryType, number>> {
+    await this.ensureConnection();
+
+    const pipeline = [
+      { $match: { projectName } },
+      {
+        $group: {
+          _id: '$memoryType',
+          count: { $sum: 1 }
+        }
+      }
+    ];
+
+    const results = await this.collection!.aggregate(pipeline).toArray();
+    const stats: Record<string, number> = {};
+
+    results.forEach(result => {
+      if (result._id) {
+        stats[result._id] = result.count;
+      }
+    });
+
+    return stats as Record<MemoryType, number>;
   }
 }

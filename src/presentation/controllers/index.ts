@@ -6,3 +6,4 @@ export * from "./memory-discover/index.js";
 export * from "./mongodb-list-projects/index.js";
 export * from "./mongodb-list-project-files/index.js";
 export * from "./mongodb-update/index.js";
+export * from "./project-context-detection/index.js";

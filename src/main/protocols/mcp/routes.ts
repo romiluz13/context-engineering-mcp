@@ -6,22 +6,25 @@ import { makeMemoryDiscoverController } from "../../factories/controllers/memory
 import { makeMongoDBListProjectsController } from "../../factories/controllers/mongodb-list-projects/mongodb-list-projects-controller-factory.js";
 import { makeMongoDBListProjectFilesController } from "../../factories/controllers/mongodb-list-project-files/mongodb-list-project-files-controller-factory.js";
 import { makeMongoDBUpdateController } from "../../factories/controllers/mongodb-update/mongodb-update-controller-factory.js";
+import { makeProjectContextDetectionController } from "../../factories/controllers/project-context-detection/project-context-detection-controller-factory.js";
 
 // Memory Bank Intelligence controllers (NEW - alioshr patterns) - TEMPORARILY DISABLED
 // import { makeMemoryBankValidateController } from "../../factories/controllers/memory-bank-validate/index.js";
 // import { makeMemoryBankInitController } from "../../factories/controllers/memory-bank-init/index.js";
 // import { makeMemoryBankContextController } from "../../factories/controllers/memory-bank-context/index.js";
 
-import { adaptMcpRequestHandler } from "./adapters/mcp-request-adapter.js";
+import { adaptMcpRequestHandler, adaptUniversalMcpRequestHandler } from "./adapters/mcp-project-aware-adapter.js";
 import { McpRouterAdapter } from "./adapters/mcp-router-adapter.js";
 
-// Backward-compatible adapter for memory_bank_read
+// Backward-compatible adapter for memory_bank_read with universal project detection
+// Following alioshr/memory-bank-mcp patterns for content return
 const adaptMemoryBankRead = (controller: any) => {
-  return adaptMcpRequestHandler({
+  return adaptUniversalMcpRequestHandler({
     handle: async (request: any) => {
       const response = await controller.handle(request);
 
       // If successful and has memory data, return only content string
+      // Following original alioshr/memory-bank-mcp pattern
       if (response.statusCode === 200 && response.body && typeof response.body === 'object' && response.body.content) {
         return {
           ...response,
@@ -54,38 +57,29 @@ export default () => {
   router.setTool({
     schema: {
       name: "list_project_files",
-      description: "List all files within a specific project",
+      description: "List all files within the current project (automatically detected using universal project detection)",
       inputSchema: {
         type: "object",
-        properties: {
-          projectName: {
-            type: "string",
-            description: "The name of the project",
-          },
-        },
-        required: ["projectName"],
+        properties: {},
+        required: [],
       },
     },
-    handler: adaptMcpRequestHandler(makeMongoDBListProjectFilesController()),
+    handler: adaptUniversalMcpRequestHandler(makeMongoDBListProjectFilesController()),
   });
 
   router.setTool({
     schema: {
       name: "memory_bank_read",
-      description: "Read a memory bank file for a specific project",
+      description: "Read a memory bank file from the current project (automatically detected using universal project detection)",
       inputSchema: {
         type: "object",
         properties: {
-          projectName: {
-            type: "string",
-            description: "The name of the project",
-          },
           fileName: {
             type: "string",
             description: "The name of the file",
           },
         },
-        required: ["projectName", "fileName"],
+        required: ["fileName"],
       },
     },
     handler: adaptMemoryBankRead(makeMemoryLoadController()),
@@ -94,14 +88,10 @@ export default () => {
   router.setTool({
     schema: {
       name: "memory_bank_write",
-      description: "Create a new memory bank file for a specific project",
+      description: "Create a new memory bank file in the current project (automatically detected using universal project detection)",
       inputSchema: {
         type: "object",
         properties: {
-          projectName: {
-            type: "string",
-            description: "The name of the project",
-          },
           fileName: {
             type: "string",
             description: "The name of the file",
@@ -111,23 +101,19 @@ export default () => {
             description: "The content of the file",
           },
         },
-        required: ["projectName", "fileName", "content"],
+        required: ["fileName", "content"],
       },
     },
-    handler: adaptMcpRequestHandler(makeMemoryStoreController()),
+    handler: adaptUniversalMcpRequestHandler(makeMemoryStoreController()),
   });
 
   router.setTool({
     schema: {
       name: "memory_bank_update",
-      description: "Update an existing memory bank file for a specific project",
+      description: "Update an existing memory bank file in the current project (automatically detected using universal project detection)",
       inputSchema: {
         type: "object",
         properties: {
-          projectName: {
-            type: "string",
-            description: "The name of the project",
-          },
           fileName: {
             type: "string",
             description: "The name of the file",
@@ -137,28 +123,57 @@ export default () => {
             description: "The content of the file",
           },
         },
-        required: ["projectName", "fileName", "content"],
+        required: ["fileName", "content"],
       },
     },
-    handler: adaptMcpRequestHandler(makeMongoDBUpdateController()),
+    handler: adaptUniversalMcpRequestHandler(makeMongoDBUpdateController()),
   });
 
   // ENHANCED MONGODB TOOLS - NEW CAPABILITIES NOT IN ORIGINAL
 
   router.setTool({
     schema: {
+      name: "detect_project_context_secure",
+      description: "Multi-layer project detection with isolation validation to ensure 100% project isolation",
+      inputSchema: {
+        type: "object",
+        properties: {
+          workingDirectory: {
+            type: "string",
+            description: "Current working directory path",
+            default: "."
+          },
+          validateIsolation: {
+            type: "boolean",
+            description: "Perform cross-project contamination checks",
+            default: true
+          },
+          forceDetection: {
+            type: "boolean",
+            description: "Force detection even if confidence is low",
+            default: false
+          },
+          preferredProjectName: {
+            type: "string",
+            description: "Preferred project name to use if provided"
+          }
+        },
+        required: []
+      }
+    },
+    handler: adaptMcpRequestHandler(makeProjectContextDetectionController()),
+  });
+
+  router.setTool({
+    schema: {
       name: "memory_search",
-      description: "Search memories using text or semantic search with MongoDB",
+      description: "Search memories in the current project using text or semantic search with MongoDB (project automatically detected using universal project detection)",
       inputSchema: {
         type: "object",
         properties: {
           query: {
             type: "string",
             description: "Search query",
-          },
-          projectName: {
-            type: "string",
-            description: "Optional project filter",
           },
           tags: {
             type: "array",
@@ -179,7 +194,7 @@ export default () => {
         required: ["query"],
       },
     },
-    handler: adaptMcpRequestHandler(makeMemorySearchController()),
+    handler: adaptUniversalMcpRequestHandler(makeMemorySearchController()),
   });
 
 
@@ -187,14 +202,10 @@ export default () => {
   router.setTool({
     schema: {
       name: "memory_discover",
-      description: "Discover related memories based on tags and content similarity",
+      description: "Discover related memories in the current project based on tags and content similarity (project automatically detected using universal project detection)",
       inputSchema: {
         type: "object",
         properties: {
-          projectName: {
-            type: "string",
-            description: "The name of the project",
-          },
           fileName: {
             type: "string",
             description: "The name of the reference memory file",
@@ -205,11 +216,13 @@ export default () => {
             default: 5,
           },
         },
-        required: ["projectName", "fileName"],
+        required: ["fileName"],
       },
     },
-    handler: adaptMcpRequestHandler(makeMemoryDiscoverController()),
+    handler: adaptUniversalMcpRequestHandler(makeMemoryDiscoverController()),
   });
+
+
 
   // MEMORY BANK INTELLIGENCE TOOLS - ORIGINAL ALIOSHR PATTERNS - TEMPORARILY DISABLED
   // TODO: Re-enable after implementing all controller files

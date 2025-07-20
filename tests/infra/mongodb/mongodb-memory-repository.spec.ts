@@ -46,7 +46,7 @@ describe("MongoDBMemoryRepository", () => {
     sut = new MongoDBMemoryRepository();
     
     // Clean up collections before each test
-    const db = connection.getDatabase();
+    const db = await connection.getDatabase();
     await db.collection("memories").deleteMany({});
     await db.collection("projects").deleteMany({});
   });
