@@ -2,6 +2,7 @@ import { MongoDBConnection } from '../../../infra/mongodb/connection/mongodb-con
 import { getCollectionNames, mongoConfig } from '../../../main/config/mongodb-config.js';
 import { VoyageEmbeddingService } from '../../../infra/ai/voyage-embedding-service.js';
 import { detectProjectForMCP } from '../../../shared/utils/project-name-normalizer.js';
+import { createMongoDBIndexes, listMongoDBIndexes } from './mongodb-index-manager.js';
 
 export interface SystemSetupResult {
   success: boolean;
@@ -217,111 +218,53 @@ export async function setupMemoryBankSystem(workingDirectory: string = process.c
     result.recommendations.push('Debug vector storage configuration');
   }
 
-  // Step 5: Vector Search Index
-  console.log('\n🔍 Step 5: Atlas Vector Search Index');
-  console.log('-----------------------------------');
+  // Step 5: MongoDB Indexes (Following Official Patterns)
+  console.log('\n🔍 Step 5: MongoDB Indexes Setup');
+  console.log('----------------------------------');
 
-  if (result.details.environment.mongodbAtlas && result.details.environment.enableVectorSearch) {
-    try {
-      const db = await MongoDBConnection.getInstance().getDatabase();
-      const collection = db.collection(getCollectionNames().memories);
+  try {
+    // Use official MongoDB patterns for index creation
+    const indexResult = await createMongoDBIndexes();
 
-      // Check if index already exists
-      let indexExists = false;
-      try {
-        const existingIndexes = await collection.listSearchIndexes().toArray();
-        indexExists = existingIndexes.some(idx => idx.name === 'vector_index');
-      } catch (listError) {
-        console.log('ℹ️  Could not list search indexes (normal for Community deployments)');
+    if (indexResult.success) {
+      result.details.vectorIndex = {
+        success: true,
+        indexName: indexResult.indexes.vectorSearch?.name || 'text_search_index',
+        status: 'created',
+        message: `✅ ${indexResult.message}`
+      };
+
+      // Add index details to recommendations for user info
+      if (indexResult.indexes.vectorSearch?.created) {
+        result.recommendations.push('✅ Vector search index created - semantic search enabled');
       }
-
-      if (indexExists) {
-        result.details.vectorIndex = {
-          success: true,
-          indexName: 'vector_index',
-          status: 'exists',
-          message: '✅ Vector search index already exists'
-        };
-      } else {
-        // Create the vector search index
-        try {
-          const indexResult = await collection.createSearchIndex({
-            name: "vector_index",
-            type: "vectorSearch",
-            definition: {
-              "fields": [
-                {
-                  "type": "vector",
-                  "path": "contentVector",
-                  "numDimensions": 1024,
-                  "similarity": "cosine"
-                },
-                {
-                  "type": "filter",
-                  "path": "projectName"
-                },
-                {
-                  "type": "filter",
-                  "path": "memoryType"
-                },
-                {
-                  "type": "filter",
-                  "path": "tags"
-                },
-                {
-                  "type": "filter",
-                  "path": "lastModified"
-                },
-                {
-                  "type": "filter",
-                  "path": "metadata.aiContextType"
-                }
-              ]
-            }
-          });
-
-          result.details.vectorIndex = {
-            success: true,
-            indexName: 'vector_index',
-            status: 'created',
-            message: `✅ Vector search index created: ${indexResult}`
-          };
-        } catch (createError: any) {
-          if (createError.message.includes('already exists')) {
-            result.details.vectorIndex = {
-              success: true,
-              indexName: 'vector_index',
-              status: 'exists',
-              message: '✅ Vector search index already exists'
-            };
-          } else {
-            result.details.vectorIndex = {
-              success: false,
-              status: 'failed',
-              message: `❌ Failed to create vector search index: ${createError.message}`
-            };
-            result.recommendations.push('Check Atlas permissions for search index creation');
-          }
-        }
+      if (indexResult.indexes.textSearch?.created) {
+        result.recommendations.push('✅ Text search index created - keyword search enabled');
       }
-
-      console.log(result.details.vectorIndex.message);
-    } catch (error: any) {
+      if (indexResult.indexes.compound?.created) {
+        result.recommendations.push('✅ Compound indexes created - query performance optimized');
+      }
+    } else {
       result.details.vectorIndex = {
         success: false,
         status: 'failed',
-        message: `❌ Vector index setup failed: ${error.message}`
+        message: `⚠️ ${indexResult.message}`
       };
-      console.log(result.details.vectorIndex.message);
-      result.recommendations.push('Debug MongoDB Atlas vector search configuration');
+
+      // Add specific recommendations from index creation
+      result.recommendations.push(...indexResult.recommendations);
     }
-  } else {
+
+    console.log(result.details.vectorIndex.message);
+
+  } catch (error: any) {
     result.details.vectorIndex = {
-      success: true,
-      status: 'not-needed',
-      message: '⏭️  Vector search index not needed (Community deployment or vector search disabled)'
+      success: false,
+      status: 'failed',
+      message: `❌ Index setup failed: ${error.message}`
     };
     console.log(result.details.vectorIndex.message);
+    result.recommendations.push('Check MongoDB connection and permissions for index creation');
   }
 
   // Final Assessment

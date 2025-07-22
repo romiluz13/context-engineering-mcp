@@ -9,7 +9,7 @@ import { makeMongoDBUpdateController } from "../../factories/controllers/mongodb
 import { makeProjectContextDetectionController } from "../../factories/controllers/project-context-detection/project-context-detection-controller-factory.js";
 import { setupMemoryBankSystem } from "../../../presentation/mcp/tools/create-vector-search-index.js";
 import { createProject, connectToProject } from "../../../presentation/mcp/tools/create-project.js";
-import { createMongoDBIndexes, listMongoDBIndexes, createVectorSearchIndexViaAPI, createVectorSearchIndexViaCommand } from "../../../presentation/mcp/tools/mongodb-index-manager.js";
+// MongoDB index management is now integrated into existing tools
 
 // Clean, focused imports - no unused template controllers
 
@@ -44,7 +44,7 @@ export default () => {
   router.setTool({
     schema: {
       name: "list_projects",
-      description: "🔍 [PRIORITY 1 - START HERE] List all projects in the memory bank. ALWAYS use this first to discover available projects before any other operation. Essential for understanding workspace structure.",
+      description: "🔍 [PRIORITY 1 - START HERE] List all projects in the memory bank with system status including MongoDB indexes. ALWAYS use this first to discover available projects before any other operation. Essential for understanding workspace structure and system health.",
       inputSchema: {
         type: "object",
         properties: {},
@@ -55,9 +55,18 @@ export default () => {
       handle: async (request: any) => {
         try {
           const { MongoDBConnection } = await import('../../../infra/mongodb/connection/mongodb-connection.js');
+          const { listMongoDBIndexes } = await import('../../../presentation/mcp/tools/mongodb-index-manager.js');
           const db = await MongoDBConnection.getInstance().getDatabase();
 
           const projects = await db.collection('projects').find({}).sort({ lastAccessed: -1 }).toArray();
+
+          // Get index information for system status
+          let indexInfo = null;
+          try {
+            indexInfo = await listMongoDBIndexes();
+          } catch (indexError) {
+            console.log('Could not retrieve index information:', indexError);
+          }
 
           const result = {
             success: true,
@@ -70,8 +79,20 @@ export default () => {
               memoryCount: p.metadata?.totalMemories || 0,
               status: p.status
             })),
+            systemStatus: {
+              totalProjects: projects.length,
+              indexes: indexInfo ? {
+                memoryIndexes: indexInfo.indexes.memories?.length || 0,
+                projectIndexes: indexInfo.indexes.projects?.length || 0,
+                searchIndexes: indexInfo.indexes.search?.length || 0,
+                status: indexInfo.success ? 'healthy' : 'issues'
+              } : {
+                status: 'unavailable',
+                message: 'Could not retrieve index information'
+              }
+            },
             message: `Found ${projects.length} projects`,
-            instructions: "Use 'connect_to_project' with projectName to connect to a project"
+            instructions: "Use 'connect_to_project' with projectName to connect to a project. System indexes are automatically managed."
           };
 
           return {
@@ -82,6 +103,13 @@ export default () => {
           const errorResult = {
             success: false,
             projects: [],
+            systemStatus: {
+              totalProjects: 0,
+              indexes: {
+                status: 'unavailable',
+                message: 'System error occurred'
+              }
+            },
             message: `Failed to list projects: ${error.message}`,
             instructions: ""
           };
@@ -383,90 +411,7 @@ export default () => {
     })
   });
 
-  // ✅ NEW: MongoDB Index Management Tools (Following Official Patterns)
-  router.setTool({
-    schema: {
-      name: "create_mongodb_indexes",
-      description: "🔧 Create MongoDB indexes programmatically following official patterns. Creates vector search (Atlas), text search, and compound indexes using exact MongoDB Node.js driver v6.17+ patterns from official documentation.",
-      inputSchema: {
-        type: "object",
-        properties: {},
-        required: []
-      }
-    },
-    handler: adaptMcpRequestHandler({
-      handle: async (request: any) => {
-        try {
-          const result = await createMongoDBIndexes();
-          return {
-            statusCode: 200,
-            body: result
-          };
-        } catch (error: any) {
-          console.error('[CREATE_INDEXES_HANDLER] Error:', error);
 
-          const errorMessage = error instanceof Error ? error.message : String(error);
-
-          return {
-            statusCode: 500,
-            body: {
-              success: false,
-              message: `❌ Index creation failed: ${errorMessage}`,
-              indexes: {},
-              recommendations: [
-                'Check MongoDB connection and permissions',
-                'Verify MongoDB version supports required index types',
-                'For vector search, ensure Atlas M10+ cluster',
-                'Check server logs for detailed error information'
-              ],
-              error: errorMessage
-            }
-          };
-        }
-      }
-    })
-  });
-
-  router.setTool({
-    schema: {
-      name: "list_mongodb_indexes",
-      description: "📋 List all MongoDB indexes on memory bank collections using official listIndexes() and listSearchIndexes() methods. Shows regular indexes, text indexes, and search indexes.",
-      inputSchema: {
-        type: "object",
-        properties: {},
-        required: []
-      }
-    },
-    handler: adaptMcpRequestHandler({
-      handle: async (request: any) => {
-        try {
-          const result = await listMongoDBIndexes();
-          return {
-            statusCode: 200,
-            body: result
-          };
-        } catch (error: any) {
-          console.error('[LIST_INDEXES_HANDLER] Error:', error);
-
-          const errorMessage = error instanceof Error ? error.message : String(error);
-
-          return {
-            statusCode: 500,
-            body: {
-              success: false,
-              error: errorMessage,
-              message: `❌ Failed to list indexes: ${errorMessage}`,
-              recommendations: [
-                'Check MongoDB connection',
-                'Verify collection exists',
-                'Check database permissions'
-              ]
-            }
-          };
-        }
-      }
-    })
-  });
 
   // Clean, focused MCP tools - no unused template controllers
 
