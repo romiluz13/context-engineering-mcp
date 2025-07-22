@@ -1,6 +1,6 @@
 {
   "name": "mongodb-memory-bank-mcp",
-  "version": "1.7.0",
+  "version": "2.2.1",
   "description": "AI-optimized memory bank with 10x-100x enhanced intelligence, MongoDB hybrid search, and perfect code generation context. Natural writing, intelligent organization.",
   "repository": {
     "type": "git",
@@ -56,8 +56,10 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.5.0",
     "@types/mongodb": "4.0.6",
+    "@types/uuid": "10.0.0",
     "axios": "1.10.0",
-    "mongodb": "6.17.0"
+    "mongodb": "6.17.0",
+    "uuid": "11.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.19",

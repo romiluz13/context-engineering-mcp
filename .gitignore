@@ -1,9 +1,85 @@
-node_modules
-.DS_Store
+# 🚀 MongoDB Memory Bank MCP - Production .gitignore
+
+# === CORE NODE.JS ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.tsbuildinfo
+.npm
+.eslintcache
+
+# === BUILD OUTPUT ===
+dist/
+build/
+out/
+.next/
+.nuxt/
+
+# === ENVIRONMENT & SECRETS ===
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-dist
-coverage
+*.key
+*.pem
+
+# === DEVELOPMENT & TESTING ===
+coverage/
+.nyc_output/
+*.lcov
+.cache/
+.parcel-cache/
+.rpt2_cache/
+.rts2_cache_*/
+
+# === IDE & EDITOR ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === OS GENERATED ===
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# === PROJECT PLANNING & REFERENCE FILES (NOT FOR OPEN SOURCE) ===
+# These files are for development planning only, not relevant for users
+mongodb-memory-bank-setup.json
+AI-INSTRUCTIONS-MONGODB-MEMORY-BANK.md
+reference-projects/
+planning/
+docs/internal/
+analysis/
+competitive-analysis/
+research-notes/
+*.planning.md
+*.analysis.md
+*.reference.md
+
+# === TEMPORARY & BACKUP FILES ===
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+.#*
+
+# === LOGS ===
+logs/
+*.log
+
+# === PACKAGE MANAGER ===
+.yarn/
+.pnp.*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

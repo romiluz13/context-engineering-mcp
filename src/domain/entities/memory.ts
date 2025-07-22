@@ -53,7 +53,17 @@ export type MemoryType =
   | 'database'             // Data models, queries, schemas
   | 'security'             // Authentication, authorization, encryption
   | 'progress'             // Status, milestones, planning
-  | 'general';             // Unclassified content
+  | 'general'              // Unclassified content
+  | 'project-overview'     // Project overview, goals, scope
+  | 'requirements'         // Requirements, specifications
+  | 'documentation'        // Documentation, guides, references
+  | 'notes'                // General notes
+  | 'research'             // Research findings
+  | 'meeting-notes'        // Meeting notes, discussions
+  | 'decisions'            // Decision records
+  | 'issues'               // Issues, problems
+  | 'tasks'                // Tasks, todos
+  | 'other';               // Other content
 
 // Backward compatible interfaces (keep existing functionality working)
 export interface MemoryRelationships {

@@ -631,27 +631,35 @@ async function smartProjectFallback(workingDirectory: string, existingSignals: P
 // we cache the last detected project from explicit detect_project_context_secure calls
 let cachedProjectName: string | null = null;
 let cacheTimestamp: number = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours (session-based persistence)
 
 /**
  * Sets the cached project name from explicit project detection
  * Called by detect_project_context_secure tool
+ * Also persists to MongoDB for cross-session reliability
  */
 export function setCachedProjectName(projectName: string): void {
   cachedProjectName = projectName;
   cacheTimestamp = Date.now();
   console.log(`[PROJECT-CACHE] Set cached project: "${projectName}" at ${new Date().toISOString()}`);
   console.log(`[PROJECT-CACHE] Cache state: name="${cachedProjectName}", timestamp=${cacheTimestamp}`);
+
+  // Persist to MongoDB for cross-session reliability (async, non-blocking)
+  persistProjectContext(projectName).catch(error => {
+    console.warn(`[PROJECT-CACHE] Failed to persist project context: ${error.message}`);
+  });
 }
 
 /**
  * Gets the cached project name if still valid
+ * Falls back to MongoDB-persisted context if memory cache is empty
  */
 export function getCachedProjectName(): string | null {
   console.log(`[PROJECT-CACHE] Checking cache: name="${cachedProjectName}", timestamp=${cacheTimestamp}`);
 
   if (!cachedProjectName) {
-    console.log(`[PROJECT-CACHE] No cached project name`);
+    console.log(`[PROJECT-CACHE] No cached project name, checking MongoDB persistence`);
+    // Try to restore from MongoDB (async, but we'll handle this in the MCP detection flow)
     return null;
   }
 
@@ -662,6 +670,7 @@ export function getCachedProjectName(): string | null {
   if (age > CACHE_DURATION) {
     console.log(`[PROJECT-CACHE] Cache expired for project: "${cachedProjectName}"`);
     cachedProjectName = null;
+    // Try to restore from MongoDB persistence
     return null;
   }
 
@@ -680,6 +689,13 @@ export async function detectProjectForMCP(mcpContext?: any): Promise<string> {
     if (cachedProject) {
       console.log(`[MCP-PROJECT-DETECTION] Using cached project: "${cachedProject}"`);
       return cachedProject;
+    }
+
+    // PRIORITY 1.5: Try to restore from MongoDB persistence
+    const restoredProject = await restoreProjectContext();
+    if (restoredProject) {
+      console.log(`[MCP-PROJECT-DETECTION] Using restored project from MongoDB: "${restoredProject}"`);
+      return restoredProject;
     }
 
     // PRIORITY 2: Use workingDirectory if provided
@@ -725,5 +741,76 @@ export async function detectProjectForMCP(mcpContext?: any): Promise<string> {
     const fallback = 'unknown-project';
     console.log(`[MCP-PROJECT-DETECTION] Using last resort fallback: "${fallback}"`);
     return fallback;
+  }
+}
+
+/**
+ * Persists project context to MongoDB for cross-session reliability
+ * Non-blocking operation that enhances cache persistence
+ */
+async function persistProjectContext(projectName: string): Promise<void> {
+  try {
+    // Import here to avoid circular dependencies
+    const { MongoDBConnection } = await import('../../infra/mongodb/connection/mongodb-connection.js');
+    const { getCollectionNames } = await import('../../main/config/mongodb-config.js');
+
+    const db = await MongoDBConnection.getInstance().getDatabase();
+    const collection = db.collection('project_context');
+
+    await collection.replaceOne(
+      { type: 'current_project' },
+      {
+        type: 'current_project',
+        projectName,
+        timestamp: new Date(),
+        cacheExpiry: new Date(Date.now() + CACHE_DURATION)
+      },
+      { upsert: true }
+    );
+
+    console.log(`[PROJECT-CACHE] Persisted project context to MongoDB: "${projectName}"`);
+  } catch (error) {
+    // Non-blocking - just log the error
+    console.warn(`[PROJECT-CACHE] Failed to persist to MongoDB: ${error instanceof Error ? error.message : error}`);
+  }
+}
+
+/**
+ * Restores project context from MongoDB persistence
+ * Used when memory cache is empty or expired
+ */
+async function restoreProjectContext(): Promise<string | null> {
+  try {
+    const { MongoDBConnection } = await import('../../infra/mongodb/connection/mongodb-connection.js');
+
+    const db = await MongoDBConnection.getInstance().getDatabase();
+    const collection = db.collection('project_context');
+
+    const doc = await collection.findOne({ type: 'current_project' });
+
+    if (!doc) {
+      console.log(`[PROJECT-CACHE] No persisted project context found`);
+      return null;
+    }
+
+    // Check if persisted context is still valid
+    const now = new Date();
+    if (doc.cacheExpiry && now > doc.cacheExpiry) {
+      console.log(`[PROJECT-CACHE] Persisted context expired for: "${doc.projectName}"`);
+      // Clean up expired context
+      await collection.deleteOne({ type: 'current_project' });
+      return null;
+    }
+
+    console.log(`[PROJECT-CACHE] Restored project context from MongoDB: "${doc.projectName}"`);
+
+    // Update memory cache with restored context
+    cachedProjectName = doc.projectName;
+    cacheTimestamp = Date.now();
+
+    return doc.projectName;
+  } catch (error) {
+    console.warn(`[PROJECT-CACHE] Failed to restore from MongoDB: ${error instanceof Error ? error.message : error}`);
+    return null;
   }
 }

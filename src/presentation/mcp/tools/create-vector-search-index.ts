@@ -259,6 +259,22 @@ export async function setupMemoryBankSystem(workingDirectory: string = process.c
                 {
                   "type": "filter",
                   "path": "projectName"
+                },
+                {
+                  "type": "filter",
+                  "path": "memoryType"
+                },
+                {
+                  "type": "filter",
+                  "path": "tags"
+                },
+                {
+                  "type": "filter",
+                  "path": "lastModified"
+                },
+                {
+                  "type": "filter",
+                  "path": "metadata.aiContextType"
                 }
               ]
             }

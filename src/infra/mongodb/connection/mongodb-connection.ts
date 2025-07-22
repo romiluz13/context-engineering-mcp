@@ -66,18 +66,23 @@ export class MongoDBConnection {
     const memoriesCollection = this.database.collection('memories');
     const projectsCollection = this.database.collection('projects');
 
-    // Memory collection indexes
-    await memoriesCollection.createIndex({ projectName: 1, fileName: 1 }, { unique: true });
-    await memoriesCollection.createIndex({ projectName: 1 });
-    await memoriesCollection.createIndex({ tags: 1 });
-    await memoriesCollection.createIndex({ lastModified: -1 });
-    
-    // Text search index for Community deployments
-    await memoriesCollection.createIndex({ 
-      content: 'text', 
-      fileName: 'text',
-      tags: 'text'
-    });
+    try {
+      console.log('[MongoDB] Creating indexes...');
+
+      // 🔧 SAFE INDEX CREATION: Handle existing indexes gracefully
+
+      // Memory collection indexes
+      await this.safeCreateIndex(memoriesCollection, { projectName: 1, fileName: 1 }, { unique: true, name: 'project_file_unique' });
+      await this.safeCreateIndex(memoriesCollection, { projectName: 1 }, { name: 'project_index' });
+      await this.safeCreateIndex(memoriesCollection, { tags: 1 }, { name: 'tags_index' });
+      await this.safeCreateIndex(memoriesCollection, { lastModified: -1 }, { name: 'last_modified_index' });
+
+      // Text search index for Community deployments
+      await this.safeCreateIndex(memoriesCollection, {
+        content: 'text',
+        fileName: 'text',
+        tags: 'text'
+      }, { name: 'content_search_index' });
 
     // ✅ FIXED: Create proper Atlas Vector Search Index (not 2dsphere)
     if (mongoConfig.isAtlas && mongoConfig.enableVectorSearch) {
@@ -99,6 +104,22 @@ export class MongoDBConnection {
               {
                 "type": "filter",
                 "path": "projectName"
+              },
+              {
+                "type": "filter",
+                "path": "memoryType"
+              },
+              {
+                "type": "filter",
+                "path": "tags"
+              },
+              {
+                "type": "filter",
+                "path": "lastModified"
+              },
+              {
+                "type": "filter",
+                "path": "metadata.aiContextType"
               }
             ]
           }
@@ -118,10 +139,30 @@ export class MongoDBConnection {
       }
     }
 
-    // Project collection indexes
-    await projectsCollection.createIndex({ name: 1 }, { unique: true });
-    await projectsCollection.createIndex({ lastAccessed: -1 });
+      // Project collection indexes
+      await this.safeCreateIndex(projectsCollection, { name: 1 }, { unique: true, name: 'project_name_unique' });
+      await this.safeCreateIndex(projectsCollection, { lastAccessed: -1 }, { name: 'last_accessed_index' });
 
-    console.log('MongoDB indexes created successfully');
+      console.log('[MongoDB] All indexes created successfully');
+    } catch (error) {
+      console.error('[MongoDB] Error creating indexes:', error);
+      console.log('[MongoDB] Continuing without perfect indexes...');
+    }
+  }
+
+  /**
+   * 🔧 SAFE INDEX CREATION: Handle existing indexes gracefully
+   */
+  private async safeCreateIndex(collection: any, keys: any, options: any = {}): Promise<void> {
+    try {
+      await collection.createIndex(keys, options);
+      console.log(`[MongoDB] Created index: ${options.name || 'unnamed'}`);
+    } catch (error: any) {
+      if (error.message.includes('already exists')) {
+        console.log(`[MongoDB] Index already exists: ${options.name || 'unnamed'}, skipping`);
+      } else {
+        console.warn(`[MongoDB] Failed to create index ${options.name || 'unnamed'}:`, error.message);
+      }
+    }
   }
 }

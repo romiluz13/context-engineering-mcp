@@ -8,6 +8,7 @@ import { makeMongoDBListProjectFilesController } from "../../factories/controlle
 import { makeMongoDBUpdateController } from "../../factories/controllers/mongodb-update/mongodb-update-controller-factory.js";
 import { makeProjectContextDetectionController } from "../../factories/controllers/project-context-detection/project-context-detection-controller-factory.js";
 import { setupMemoryBankSystem } from "../../../presentation/mcp/tools/create-vector-search-index.js";
+import { createProject, connectToProject } from "../../../presentation/mcp/tools/create-project.js";
 
 // Clean, focused imports - no unused template controllers
 
@@ -42,20 +43,61 @@ export default () => {
   router.setTool({
     schema: {
       name: "list_projects",
-      description: "List all projects in the memory bank",
+      description: "🔍 [PRIORITY 1 - START HERE] List all projects in the memory bank. ALWAYS use this first to discover available projects before any other operation. Essential for understanding workspace structure.",
       inputSchema: {
         type: "object",
         properties: {},
         required: [],
       },
     },
-    handler: adaptMcpRequestHandler(makeMongoDBListProjectsController()),
+    handler: adaptMcpRequestHandler({
+      handle: async (request: any) => {
+        try {
+          const { MongoDBConnection } = await import('../../../infra/mongodb/connection/mongodb-connection.js');
+          const db = await MongoDBConnection.getInstance().getDatabase();
+
+          const projects = await db.collection('projects').find({}).sort({ lastAccessed: -1 }).toArray();
+
+          const result = {
+            success: true,
+            projects: projects.map(p => ({
+              projectName: p.projectName,
+              projectId: p.projectId,
+              description: p.description,
+              createdAt: p.createdAt,
+              lastAccessed: p.lastAccessed,
+              memoryCount: p.metadata?.totalMemories || 0,
+              status: p.status
+            })),
+            message: `Found ${projects.length} projects`,
+            instructions: "Use 'connect_to_project' with projectName to connect to a project"
+          };
+
+          return {
+            statusCode: 200,
+            body: result
+          };
+        } catch (error: any) {
+          const errorResult = {
+            success: false,
+            projects: [],
+            message: `Failed to list projects: ${error.message}`,
+            instructions: ""
+          };
+
+          return {
+            statusCode: 500,
+            body: errorResult
+          };
+        }
+      }
+    })
   });
 
   router.setTool({
     schema: {
       name: "list_project_files",
-      description: "List all files within the current project (automatically detected using universal project detection)",
+      description: "📁 [PRIORITY 2 - EXPLORE] List all files within a specific project. Use after `list_projects` to discover what files exist before reading them. Critical for understanding project content and checking which of the 6 core files have real content vs templates.",
       inputSchema: {
         type: "object",
         properties: {},
@@ -68,7 +110,7 @@ export default () => {
   router.setTool({
     schema: {
       name: "memory_bank_read",
-      description: "Read a memory bank file from the current project (automatically detected using universal project detection)",
+      description: "📖 [PRIORITY 3 - READ] Read a memory bank file for a specific project. Primary method to access file content. Use after `list_project_files` to read specific files.",
       inputSchema: {
         type: "object",
         properties: {
@@ -86,7 +128,7 @@ export default () => {
   router.setTool({
     schema: {
       name: "memory_bank_write",
-      description: "Create a new memory bank file in the current project (automatically detected using universal project detection)",
+      description: "✏️ [CREATE NEW] Create a new memory bank file for a specific project with intelligent routing to core files. Use when you need to create brand new files. FAILS if file already exists (use memory_bank_update for existing files). IMPORTANT: The system works best when ALL 6 core files have real content, not just templates.",
       inputSchema: {
         type: "object",
         properties: {
@@ -113,27 +155,7 @@ export default () => {
     handler: adaptUniversalMcpRequestHandler(makeMemoryStoreController()),
   });
 
-  router.setTool({
-    schema: {
-      name: "memory_bank_update",
-      description: "Update an existing memory bank file in the current project (automatically detected using universal project detection)",
-      inputSchema: {
-        type: "object",
-        properties: {
-          fileName: {
-            type: "string",
-            description: "The name of the file",
-          },
-          content: {
-            type: "string",
-            description: "The content of the file",
-          },
-        },
-        required: ["fileName", "content"],
-      },
-    },
-    handler: adaptUniversalMcpRequestHandler(makeMongoDBUpdateController()),
-  });
+  // REMOVED: memory_bank_update - functionality merged into memory_bank_write with intelligent routing
 
   // ENHANCED MONGODB TOOLS - NEW CAPABILITIES NOT IN ORIGINAL
 
@@ -167,19 +189,19 @@ export default () => {
         required: []
       }
     },
-    handler: adaptMcpRequestHandler(makeProjectContextDetectionController()),
+    handler: adaptUniversalMcpRequestHandler(makeProjectContextDetectionController()),
   });
 
   router.setTool({
     schema: {
       name: "memory_search",
-      description: "Search memories in the current project using text or semantic search with MongoDB (project automatically detected using universal project detection)",
+      description: "🔍 [HIGH PRIORITY - SEARCH] Search for files containing specific text within a project using hybrid search with MongoDB $rankFusion. Essential for finding relevant files when you don't know exact filenames.",
       inputSchema: {
         type: "object",
         properties: {
           query: {
             type: "string",
-            description: "Search query",
+            description: "Search query or filename for discovery",
           },
           tags: {
             type: "array",
@@ -194,7 +216,16 @@ export default () => {
           useSemanticSearch: {
             type: "boolean",
             description: "Use semantic search if available (Atlas only)",
+            default: true,
+          },
+          discoverMode: {
+            type: "boolean",
+            description: "Enable discovery mode to find related memories",
             default: false,
+          },
+          memoryType: {
+            type: "string",
+            description: "Filter by memory type (e.g., 'documentation', 'architecture')",
           },
         },
         required: ["query"],
@@ -203,42 +234,58 @@ export default () => {
     handler: adaptUniversalMcpRequestHandler(makeMemorySearchController()),
   });
 
-
-
+  // 🔄 SEPARATE UPDATE TOOL - Only updates existing files (prevents accidental overwrites)
   router.setTool({
     schema: {
-      name: "memory_discover",
-      description: "Discover related memories in the current project based on tags and content similarity (project automatically detected using universal project detection)",
+      name: "memory_bank_update",
+      description: "🔄 [MODIFY EXISTING] Update an existing memory bank file for a specific project. Automatically creates version history. ONLY works on existing files - fails if file doesn't exist (use memory_bank_write for new files).",
       inputSchema: {
         type: "object",
         properties: {
           fileName: {
             type: "string",
-            description: "The name of the reference memory file",
+            description: "The name of the file to update",
           },
-          limit: {
-            type: "number",
-            description: "Maximum number of related memories to return (default: 5)",
-            default: 5,
+          content: {
+            type: "string",
+            description: "The new content of the file",
+          },
+          projectName: {
+            type: "string",
+            description: "Optional explicit project name (overrides auto-detection)",
+          },
+          workingDirectory: {
+            type: "string",
+            description: "Optional working directory for project detection (defaults to auto-detection)",
           },
         },
-        required: ["fileName"],
+        required: ["fileName", "content"],
       },
     },
-    handler: adaptUniversalMcpRequestHandler(makeMemoryDiscoverController()),
+    handler: adaptUniversalMcpRequestHandler(makeMongoDBUpdateController()),
   });
 
-  // ✅ NEW: Complete Memory Bank System Setup Tool
+  // REMOVED: memory_discover - functionality merged into enhanced memory_search
+
+  // ✅ NEW: Create Project Tool (Replaces broken setup)
   router.setTool({
     schema: {
-      name: "setup_memory_bank_system",
-      description: "Complete system setup: project detection, environment validation, vector index creation, and health check",
+      name: "create_project",
+      description: "Create a new memory bank project with complete Cline structure and hybrid search initialization",
       inputSchema: {
         type: "object",
         properties: {
+          projectName: {
+            type: "string",
+            description: "Project name (e.g., 'my-app', 'website-redesign'). If not provided, will generate one."
+          },
+          description: {
+            type: "string",
+            description: "Brief project description"
+          },
           workingDirectory: {
             type: "string",
-            description: "Working directory for project detection (defaults to current directory)",
+            description: "Working directory (defaults to current directory)",
             default: "."
           }
         },
@@ -248,8 +295,54 @@ export default () => {
     handler: adaptMcpRequestHandler({
       handle: async (request: any) => {
         try {
-          const workingDirectory = request.workingDirectory || process.cwd();
-          const result = await setupMemoryBankSystem(workingDirectory);
+          const result = await createProject(request);
+          return {
+            statusCode: 200,
+            body: result
+          };
+        } catch (error: any) {
+          const errorResult = {
+            success: false,
+            projectId: '',
+            projectName: '',
+            message: `Project creation failed: ${error.message}`,
+            coreFiles: [],
+            connectionInfo: {
+              projectName: '',
+              projectId: '',
+              workingDirectory: ''
+            }
+          };
+
+          return {
+            statusCode: 500,
+            body: errorResult
+          };
+        }
+      }
+    })
+  });
+
+  // ✅ NEW: Connect to Project Tool
+  router.setTool({
+    schema: {
+      name: "connect_to_project",
+      description: "Connect to an existing memory bank project by name or ID",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectName: {
+            type: "string",
+            description: "Project name or ID to connect to"
+          }
+        },
+        required: ["projectName"]
+      }
+    },
+    handler: adaptMcpRequestHandler({
+      handle: async (request: any) => {
+        try {
+          const result = await connectToProject(request.projectName);
           return {
             statusCode: 200,
             body: result
@@ -259,9 +352,8 @@ export default () => {
             statusCode: 500,
             body: {
               success: false,
-              message: `Setup failed: ${error.message}`,
-              details: {},
-              recommendations: ['Check system logs for detailed error information']
+              message: `Connection failed: ${error.message}`,
+              recommendations: ['Check project name and try again']
             }
           };
         }

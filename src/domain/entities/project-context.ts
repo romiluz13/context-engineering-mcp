@@ -39,15 +39,21 @@ export interface DirectoryContext {
 export interface ProjectDetectionResult {
   projectName: string;
   confidence: number;
-  detectionMethod: 'git' | 'package' | 'directory' | 'hybrid';
+  detectionMethod: 'git' | 'package' | 'directory' | 'hybrid' | 'preferred' | 'git-root' | 'package-name' | 'directory-name' | 'recent-activity' | 'file-markers' | 'smart-default';
   workingDirectory: string;
-  gitContext: GitContext;
-  packageContext: PackageContext;
-  directoryContext: DirectoryContext;
+  gitContext?: GitContext;
+  packageContext?: PackageContext;
+  directoryContext?: DirectoryContext;
   isolationValidated: boolean;
   existsInMemoryBank: boolean;
   warnings: string[];
   recommendations: string[];
+  signals?: Array<{
+    type: string;
+    confidence: number;
+    projectName: string;
+    evidence: string[];
+  }>;
 }
 
 export interface ProjectIsolationValidation {

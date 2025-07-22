@@ -5,6 +5,7 @@ import {
 import { Controller } from "../../../../presentation/protocols/controller.js";
 import { serializeError } from "../helpers/serialize-error.js";
 import { normalizeProjectNameSafe, getCurrentProjectName, detectProjectFromPath, detectProjectForMCP } from "../../../../shared/utils/project-name-normalizer.js";
+import { getProjectName } from "../../../../shared/services/project-context-manager.js";
 import { MCPRequestHandler } from "./mcp-router-adapter.js";
 
 /**
@@ -64,10 +65,9 @@ export const adaptUniversalMcpRequestHandler = async <
         console.log(`[MCP-ADAPTER] Request body:`, JSON.stringify(body));
         console.log(`[MCP-ADAPTER] Extracted workingDirectory: "${workingDirectory}"`);
 
-        // Create MCP context with working directory
-        const mcpContext = workingDirectory ? { workingDirectory } : request;
-        console.log(`[MCP-ADAPTER] MCP context:`, JSON.stringify(mcpContext));
-        projectName = await detectProjectForMCP(mcpContext);
+        // Use master project context manager for 100% consistency
+        console.log(`[MCP-ADAPTER] Using master project context manager`);
+        projectName = await getProjectName(workingDirectory);
       }
 
       // Inject or override project name with detected value

@@ -278,80 +278,194 @@ export class MongoDBMemoryRepository implements MemoryRepository {
   private async semanticSearch(params: MemorySearchParams): Promise<MemorySearchResult[]> {
     const { query, projectName, tags, limit = 10 } = params;
 
+    console.log(`[🔥 GOLDEN FEATURE] Starting MongoDB $rankFusion hybrid search for: "${query}"`);
+
     // Generate query embedding
     const queryVector = await this.embeddingService.generateQueryEmbedding(query);
     if (!queryVector) {
-      // Fall back to text search if embedding generation fails
+      console.log(`[⚠️ EMBEDDING FAILED] Falling back to text search`);
       return this.textSearch(params);
     }
 
-    // Build aggregation pipeline for hybrid search
-    const pipeline: any[] = [];
+    // 🚀 REVOLUTIONARY: Check if MongoDB supports $rankFusion (8.1+)
+    const supportsRankFusion = await this.checkRankFusionSupport();
 
-    // Vector search pipeline
-    const vectorSearchStage = {
-      $vectorSearch: {
-        index: 'vector_index', // This would need to be created in Atlas
-        path: 'contentVector',
-        queryVector: queryVector,
-        numCandidates: limit * 10,
-        limit: limit
-      }
-    };
-
-    // Text search pipeline
-    const textSearchStage = {
-      $search: {
-        index: 'text_index', // This would need to be created in Atlas
-        text: {
-          query: query,
-          path: ['content', 'fileName', 'tags']
-        }
-      }
-    };
-
-    // Use $rankFusion for hybrid search (MongoDB 8.1+ with automatic fallback)
-    if (mongoConfig.isAtlas) {
-      pipeline.push({
-        $rankFusion: {
-          input: {
-            pipelines: [
-              [vectorSearchStage],
-              [textSearchStage]
-            ]
-          }
-        }
-      });
+    if (supportsRankFusion) {
+      console.log(`[🎯 $RANKFUSION] Using MongoDB's revolutionary hybrid search with reciprocal rank fusion`);
+      return this.hybridRankFusionSearch(query, queryVector, projectName, tags, limit);
     } else {
-      // Fallback to vector search only
-      pipeline.push(vectorSearchStage);
+      console.log(`[⚠️ FALLBACK] MongoDB version doesn't support $rankFusion, using vector search only`);
+      return this.vectorOnlySearch(query, queryVector, projectName, tags, limit);
     }
+  }
 
-    // Add filters
-    const matchStage: any = {};
-    if (projectName) {
-      matchStage.projectName = projectName;
-    }
-    if (tags && tags.length > 0) {
-      matchStage.tags = { $in: tags };
-    }
-
-    if (Object.keys(matchStage).length > 0) {
-      pipeline.push({ $match: matchStage });
-    }
-
-    pipeline.push({ $limit: limit });
-
+  /**
+   * 🔥 GOLDEN FEATURE: MongoDB's Revolutionary $rankFusion Hybrid Search
+   * This is the crown jewel - combining vector + text search with reciprocal rank fusion
+   */
+  private async hybridRankFusionSearch(
+    query: string,
+    queryVector: number[],
+    projectName?: string,
+    tags?: string[],
+    limit: number = 10
+  ): Promise<MemorySearchResult[]> {
     try {
+      // 🎯 Build the revolutionary $rankFusion pipeline
+      const pipeline: any[] = [
+        {
+          $rankFusion: {
+            input: {
+              pipelines: {
+                // 🎯 Vector Search Pipeline - Semantic Understanding
+                vectorPipeline: [
+                  {
+                    $vectorSearch: {
+                      index: 'vector_index',
+                      path: 'contentVector',
+                      queryVector: queryVector,
+                      numCandidates: Math.min(limit * 10, 100),
+                      limit: limit * 2
+                    }
+                  },
+                  ...(projectName ? [{ $match: { projectName } }] : []),
+                  ...(tags && tags.length > 0 ? [{ $match: { tags: { $in: tags } } }] : [])
+                ],
+                // 🎯 Text Search Pipeline - Exact Keyword Matching
+                textPipeline: [
+                  {
+                    $search: {
+                      index: 'default',
+                      text: {
+                        query: query,
+                        path: ['content', 'fileName', 'tags']
+                      }
+                    }
+                  },
+                  ...(projectName ? [{ $match: { projectName } }] : []),
+                  ...(tags && tags.length > 0 ? [{ $match: { tags: { $in: tags } } }] : []),
+                  { $limit: limit * 2 }
+                ]
+              }
+            },
+            // 🎯 Weighted Reciprocal Rank Fusion - The Magic Formula
+            combination: {
+              weights: {
+                vectorPipeline: 0.6,  // Favor semantic understanding
+                textPipeline: 0.4     // But include exact matches
+              }
+            },
+            scoreDetails: true
+          }
+        },
+        {
+          $addFields: {
+            score: { $meta: "scoreDetails" },
+            relevance: "hybrid-rankfusion"
+          }
+        },
+        { $limit: limit }
+      ];
+
+      console.log(`[🎉 $RANKFUSION] Executing hybrid search with weighted reciprocal rank fusion`);
       const docs = await this.collection!.aggregate<MemorySearchDocument>(pipeline).toArray();
+
+      console.log(`[📊 HYBRID POWER] Found ${docs.length} results using MongoDB's unique $rankFusion algorithm`);
+
       return docs.map(doc => ({
         ...this.documentToMemory(doc),
         score: doc.score || 1.0,
-        relevance: 'semantic-match'
+        relevance: 'hybrid-rankfusion'
       }));
     } catch (error) {
-      console.error('Semantic search failed, falling back to text search:', error);
-      return this.textSearch(params);
+      console.error(`[❌ $RANKFUSION ERROR] Hybrid search failed:`, error);
+      // Fallback to vector-only search
+      return this.vectorOnlySearch(query, queryVector, projectName, tags, limit);
+    }
+  }
+
+  /**
+   * 🎯 Vector-Only Search - Fallback for older MongoDB versions
+   */
+  private async vectorOnlySearch(
+    query: string,
+    queryVector: number[],
+    projectName?: string,
+    tags?: string[],
+    limit: number = 10
+  ): Promise<MemorySearchResult[]> {
+    try {
+      const pipeline: any[] = [
+        {
+          $vectorSearch: {
+            index: 'vector_index',
+            path: 'contentVector',
+            queryVector: queryVector,
+            numCandidates: Math.min(limit * 10, 100),
+            limit: limit
+          }
+        }
+      ];
+
+      // Add filters
+      const matchStage: any = {};
+      if (projectName) {
+        matchStage.projectName = projectName;
+      }
+      if (tags && tags.length > 0) {
+        matchStage.tags = { $in: tags };
+      }
+
+      if (Object.keys(matchStage).length > 0) {
+        pipeline.push({ $match: matchStage });
+      }
+
+      pipeline.push({ $limit: limit });
+
+      const docs = await this.collection!.aggregate<MemorySearchDocument>(pipeline).toArray();
+
+      console.log(`[✅ VECTOR SUCCESS] Found ${docs.length} vector-only results`);
+
+      return docs.map(doc => ({
+        ...this.documentToMemory(doc),
+        score: doc.score || 1.0,
+        relevance: 'vector-match'
+      }));
+    } catch (error) {
+      console.error(`[❌ VECTOR ERROR] Vector search failed:`, error);
+      // Final fallback to text search
+      return this.textSearch({ query, projectName, tags, limit });
+    }
+  }
+
+  /**
+   * 🔍 Check if MongoDB supports $rankFusion (requires 8.1+)
+   */
+  private async checkRankFusionSupport(): Promise<boolean> {
+    try {
+      await this.ensureConnection();
+      const adminDb = this.db!.admin();
+      const buildInfo = await adminDb.buildInfo();
+
+      // Parse version string (e.g., "8.1.0" or "8.1.0-rc1")
+      const versionMatch = buildInfo.version.match(/^(\d+)\.(\d+)/);
+      if (!versionMatch) {
+        console.log(`[⚠️ VERSION] Could not parse MongoDB version: ${buildInfo.version}`);
+        return false;
+      }
+
+      const major = parseInt(versionMatch[1]);
+      const minor = parseInt(versionMatch[2]);
+
+      // $rankFusion requires MongoDB 8.1+
+      const supportsRankFusion = major > 8 || (major === 8 && minor >= 1);
+
+      console.log(`[📊 VERSION CHECK] MongoDB ${buildInfo.version} - $rankFusion support: ${supportsRankFusion}`);
+
+      return supportsRankFusion;
+    } catch (error) {
+      console.log(`[⚠️ VERSION CHECK] Failed to check MongoDB version, assuming no $rankFusion support:`, error instanceof Error ? error.message : String(error));
+      return false;
     }
   }
 
