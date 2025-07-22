@@ -9,6 +9,7 @@ import { makeMongoDBUpdateController } from "../../factories/controllers/mongodb
 import { makeProjectContextDetectionController } from "../../factories/controllers/project-context-detection/project-context-detection-controller-factory.js";
 import { setupMemoryBankSystem } from "../../../presentation/mcp/tools/create-vector-search-index.js";
 import { createProject, connectToProject } from "../../../presentation/mcp/tools/create-project.js";
+import { createMongoDBIndexes, listMongoDBIndexes, createVectorSearchIndexViaAPI, createVectorSearchIndexViaCommand } from "../../../presentation/mcp/tools/mongodb-index-manager.js";
 
 // Clean, focused imports - no unused template controllers
 
@@ -374,6 +375,91 @@ export default () => {
                 'Verify the project name spelling',
                 'Try creating a new project if needed',
                 'Check server logs for details'
+              ]
+            }
+          };
+        }
+      }
+    })
+  });
+
+  // ✅ NEW: MongoDB Index Management Tools (Following Official Patterns)
+  router.setTool({
+    schema: {
+      name: "create_mongodb_indexes",
+      description: "🔧 Create MongoDB indexes programmatically following official patterns. Creates vector search (Atlas), text search, and compound indexes using exact MongoDB Node.js driver v6.17+ patterns from official documentation.",
+      inputSchema: {
+        type: "object",
+        properties: {},
+        required: []
+      }
+    },
+    handler: adaptMcpRequestHandler({
+      handle: async (request: any) => {
+        try {
+          const result = await createMongoDBIndexes();
+          return {
+            statusCode: 200,
+            body: result
+          };
+        } catch (error: any) {
+          console.error('[CREATE_INDEXES_HANDLER] Error:', error);
+
+          const errorMessage = error instanceof Error ? error.message : String(error);
+
+          return {
+            statusCode: 500,
+            body: {
+              success: false,
+              message: `❌ Index creation failed: ${errorMessage}`,
+              indexes: {},
+              recommendations: [
+                'Check MongoDB connection and permissions',
+                'Verify MongoDB version supports required index types',
+                'For vector search, ensure Atlas M10+ cluster',
+                'Check server logs for detailed error information'
+              ],
+              error: errorMessage
+            }
+          };
+        }
+      }
+    })
+  });
+
+  router.setTool({
+    schema: {
+      name: "list_mongodb_indexes",
+      description: "📋 List all MongoDB indexes on memory bank collections using official listIndexes() and listSearchIndexes() methods. Shows regular indexes, text indexes, and search indexes.",
+      inputSchema: {
+        type: "object",
+        properties: {},
+        required: []
+      }
+    },
+    handler: adaptMcpRequestHandler({
+      handle: async (request: any) => {
+        try {
+          const result = await listMongoDBIndexes();
+          return {
+            statusCode: 200,
+            body: result
+          };
+        } catch (error: any) {
+          console.error('[LIST_INDEXES_HANDLER] Error:', error);
+
+          const errorMessage = error instanceof Error ? error.message : String(error);
+
+          return {
+            statusCode: 500,
+            body: {
+              success: false,
+              error: errorMessage,
+              message: `❌ Failed to list indexes: ${errorMessage}`,
+              recommendations: [
+                'Check MongoDB connection',
+                'Verify collection exists',
+                'Check database permissions'
               ]
             }
           };
