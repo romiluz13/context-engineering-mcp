@@ -5,6 +5,8 @@ import { ProjectRepository } from "../../protocols/project-repository.js";
 import { MemoryType } from "../../../domain/entities/memory.js";
 import { ClineMemoryStructure, CLINE_CORE_FILES } from "../../../shared/services/cline-memory-structure.js";
 import { validateProjectContext } from "../../../shared/services/project-context-manager.js";
+import { MCPErrorHandler } from "../../../shared/errors/mcp-error.js";
+import { MemoryBankSession } from "../../../shared/state/session-state.js";
 
 export class MemoryStore implements MemoryStoreUseCase {
   constructor(
@@ -13,15 +15,22 @@ export class MemoryStore implements MemoryStoreUseCase {
   ) {}
 
   async store(params: MemoryStoreParams): Promise<Memory> {
-    const { projectName, fileName, content, tags = [] } = params;
+    const session = MemoryBankSession.getInstance();
+    const startTime = new Date();
 
-    console.log(`[MEMORY-STORE] 🔍 HYBRID SEARCH FIRST: Starting with search for project: ${projectName}`);
+    try {
+      const { projectName, fileName, content, tags = [] } = params;
 
-    // 🔒 PROJECT VALIDATION: Ensure we're working on the correct project
-    const isValidProject = await validateProjectContext(projectName);
-    if (!isValidProject) {
-      throw new Error(`Project context validation failed for: ${projectName}`);
-    }
+      console.log(`[MEMORY-STORE] 🔍 HYBRID SEARCH FIRST: Starting with search for project: ${projectName}`);
+
+      // 🔒 PROJECT VALIDATION: Ensure we're working on the correct project
+      const isValidProject = await validateProjectContext(projectName);
+      if (!isValidProject) {
+        throw new Error(`Project context validation failed for: ${projectName}`);
+      }
+
+      // Update session state
+      session.setActiveProject(projectName);
 
     // Ensure project exists
     await this.projectRepository.ensureProject(projectName);
@@ -114,7 +123,38 @@ export class MemoryStore implements MemoryStoreUseCase {
     // 🤖 AI GUIDANCE: Check if all core files have real content
     await this.provideAIGuidanceForCompleteness(projectName, storedMemory);
 
+    // Record successful operation
+    session.updateAfterOperation({
+      name: 'memory_store',
+      parameters: params,
+      timestamp: startTime,
+      success: true,
+      result: { fileName: storedMemory.fileName, projectName: storedMemory.projectName }
+    });
+
     return storedMemory;
+
+    } catch (error) {
+      // Record failed operation
+      session.updateAfterOperation({
+        name: 'memory_store',
+        parameters: params,
+        timestamp: startTime,
+        success: false,
+        error: MCPErrorHandler.formatError(error, { operation: 'memory_store', params })
+      });
+
+      // Re-throw with better error formatting
+      throw MCPErrorHandler.formatError(error, {
+        operation: 'memory_store',
+        params,
+        suggestions: [
+          'Check if the project exists',
+          'Use memory_bank_update for existing files',
+          'Verify your MongoDB connection'
+        ]
+      });
+    }
   }
 
   // 🧠 ENHANCED: INTELLIGENT CONTENT ANALYSIS FOR OPTIMAL AI CONTEXT

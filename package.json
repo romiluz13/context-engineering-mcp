@@ -1,7 +1,7 @@
 {
   "name": "mongodb-memory-bank-mcp",
-  "version": "2.3.1",
-  "description": "Revolutionary MongoDB Memory Bank MCP with intelligent content routing, $rankFusion hybrid search, and bulletproof 6-file structure maintenance. World's first MCP showcasing MongoDB's AI superiority.",
+  "version": "2.4.0",
+  "description": "FIXED: MongoDB Memory Bank MCP with bulletproof error handling, smart operations, and session state management. Eliminates [object Object] errors and user confusion.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/romiluz13/context-engineering-mcp.git"
@@ -10,6 +10,11 @@
     "mcp",
     "memory-bank",
     "mongodb",
+    "error-handling",
+    "smart-operations",
+    "session-state",
+    "user-experience",
+    "production-ready",
     "ai-context",
     "code-generation",
     "hybrid-search",
@@ -18,17 +23,8 @@
     "intelligent-organization",
     "cline-structure",
     "developer-tools",
-    "semantic-search",
-    "intelligent-tagging",
-    "project-isolation",
-    "natural-language",
-    "path-based-detection",
-    "automatic-project-isolation",
-    "universal-detection",
-    "structured-memory",
-    "multi-signal-detection",
-    "6-file-structure",
-    "content-merging"
+    "bug-fixes",
+    "reliability"
   ],
   "bugs": {
     "url": "https://github.com/romiluz13/context-engineering-mcp/issues"
