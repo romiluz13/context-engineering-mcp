@@ -5,6 +5,8 @@ import { MemoryDocument, MemorySearchDocument } from '../models/memory-document.
 import { MongoDBConnection } from '../connection/mongodb-connection.js';
 import { getCollectionNames, mongoConfig } from '../../../main/config/mongodb-config.js';
 import { VoyageEmbeddingService } from '../../ai/voyage-embedding-service.js';
+import { ContentRoutingService } from '../../../shared/services/content-routing-service.js';
+import { CLINE_CORE_FILES } from '../../../shared/services/cline-memory-structure.js';
 // Removed unused template imports
 
 export class MongoDBMemoryRepository implements MemoryRepository {
@@ -101,6 +103,48 @@ export class MongoDBMemoryRepository implements MemoryRepository {
 
   async update(projectName: string, fileName: string, content: string): Promise<Memory | null> {
     await this.ensureConnection();
+
+    // 🎯 CONTENT ROUTING: Implement intelligent content routing to maintain 6-file structure
+    const existingFiles = await this.listFiles(projectName);
+    const existingFileNames = existingFiles.map(f => f.fileName);
+
+    // Analyze content and determine routing
+    const routingResult = ContentRoutingService.routeContent(fileName, content, existingFileNames);
+
+    console.log(`[CONTENT-ROUTING] ${fileName} → ${routingResult.targetFile} (${routingResult.confidence}% confidence: ${routingResult.reasoning})`);
+
+    // If routing to a different file, merge content with target file
+    if (routingResult.targetFile !== fileName && routingResult.shouldMerge) {
+      const targetMemory = await this.load(projectName, routingResult.targetFile);
+      if (targetMemory) {
+        const mergedContent = ContentRoutingService.mergeContent(
+          targetMemory.content,
+          content,
+          routingResult.mergeStrategy
+        );
+
+        // Update the target file with merged content
+        const updateDoc = {
+          $set: {
+            content: mergedContent,
+            lastModified: new Date(),
+            wordCount: this.countWords(mergedContent),
+            tags: [...(targetMemory.tags || []), 'auto-merged', 'content-routed']
+          }
+        };
+
+        const result = await this.collection!.findOneAndUpdate(
+          { projectName, fileName: routingResult.targetFile },
+          updateDoc,
+          { returnDocument: 'after' }
+        );
+
+        console.log(`[CONTENT-ROUTING] Successfully merged content into ${routingResult.targetFile}`);
+        return result ? this.documentToMemory(result) : null;
+      }
+    }
+
+    // Standard update for direct file updates
     const updateDoc = {
       $set: {
         content,
@@ -129,6 +173,16 @@ export class MongoDBMemoryRepository implements MemoryRepository {
   }
 
   async listByProject(projectName: string): Promise<Memory[]> {
+    await this.ensureConnection();
+    const docs = await this.collection!
+      .find({ projectName })
+      .sort({ lastModified: -1 })
+      .toArray();
+
+    return docs.map(doc => this.documentToMemory(doc));
+  }
+
+  async listFiles(projectName: string): Promise<Memory[]> {
     await this.ensureConnection();
     const docs = await this.collection!
       .find({ projectName })

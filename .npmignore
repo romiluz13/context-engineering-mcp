@@ -1,0 +1,76 @@
+# 📦 MongoDB Memory Bank MCP - NPM Publication Filter
+# Only include essential files for production use
+
+# === SOURCE CODE (exclude from npm) ===
+src/
+tests/
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+
+# === DEVELOPMENT FILES ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.env*
+.eslintrc*
+.prettierrc*
+tsconfig.json
+vitest.config.ts
+jest.config.js
+
+# === BUILD & DEVELOPMENT ===
+node_modules/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+.cache/
+.parcel-cache/
+
+# === DOCUMENTATION & PLANNING (exclude from npm) ===
+docs/
+planning/
+analysis/
+research-notes/
+reference-projects/
+competitive-analysis/
+*.planning.md
+*.analysis.md
+*.reference.md
+AI-INSTRUCTIONS-MONGODB-MEMORY-BANK.md
+mongodb-memory-bank-setup.json
+
+# === SCRIPTS & SETUP (exclude from npm) ===
+scripts/
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# === LOGS & TEMP ===
+logs/
+*.log
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# === PACKAGE MANAGER ===
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.yarn/
+.pnp.*
+
+# === CUSTOM INSTRUCTIONS (keep for users) ===
+!CUSTOM_INSTRUCTIONS.md
+
+# === INCLUDE ONLY THESE ESSENTIAL FILES ===
+# dist/ (built code)
+# package.json
+# README.md
+# LICENSE
+# CUSTOM_INSTRUCTIONS.md

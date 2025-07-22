@@ -128,13 +128,13 @@ export default () => {
   router.setTool({
     schema: {
       name: "memory_bank_write",
-      description: "✏️ [CREATE NEW] Create a new memory bank file for a specific project with intelligent routing to core files. Use when you need to create brand new files. FAILS if file already exists (use memory_bank_update for existing files). IMPORTANT: The system works best when ALL 6 core files have real content, not just templates.",
+      description: "✏️ [RARELY USED - CREATE NEW] Create a new memory bank file ONLY for initial project setup. CRITICAL: Use memory_bank_update for existing projects. MUST call memory_search FIRST to check if content belongs in existing core files (projectbrief.md, productContext.md, systemPatterns.md, techContext.md, activeContext.md, progress.md). FAILS if file already exists.",
       inputSchema: {
         type: "object",
         properties: {
           fileName: {
             type: "string",
-            description: "The name of the file",
+            description: "The name of the file (should be one of 6 core files: projectbrief.md, productContext.md, systemPatterns.md, techContext.md, activeContext.md, progress.md)",
           },
           content: {
             type: "string",
@@ -195,18 +195,18 @@ export default () => {
   router.setTool({
     schema: {
       name: "memory_search",
-      description: "🔍 [HIGH PRIORITY - SEARCH] Search for files containing specific text within a project using hybrid search with MongoDB $rankFusion. Essential for finding relevant files when you don't know exact filenames.",
+      description: "🔍 [MANDATORY FIRST STEP] Search for files containing specific text within a project using MongoDB $rankFusion hybrid search. ALWAYS use this BEFORE any write/update operations to find existing content and determine proper file routing. Essential for maintaining 6-file structure and preventing content accumulation.",
       inputSchema: {
         type: "object",
         properties: {
           query: {
             type: "string",
-            description: "Search query or filename for discovery",
+            description: "Search query for content discovery - use broad terms to find related existing content",
           },
           tags: {
             type: "array",
             items: { type: "string" },
-            description: "Optional tag filters",
+            description: "Optional tag filters (e.g., 'core', 'cline-structure')",
           },
           limit: {
             type: "number",
@@ -215,7 +215,7 @@ export default () => {
           },
           useSemanticSearch: {
             type: "boolean",
-            description: "Use semantic search if available (Atlas only)",
+            description: "Use semantic search with $rankFusion (ALWAYS set to true for best results)",
             default: true,
           },
           discoverMode: {
@@ -234,21 +234,21 @@ export default () => {
     handler: adaptUniversalMcpRequestHandler(makeMemorySearchController()),
   });
 
-  // 🔄 SEPARATE UPDATE TOOL - Only updates existing files (prevents accidental overwrites)
+  // 🔄 PRIMARY TOOL - Updates existing files (maintains 6-file structure)
   router.setTool({
     schema: {
       name: "memory_bank_update",
-      description: "🔄 [MODIFY EXISTING] Update an existing memory bank file for a specific project. Automatically creates version history. ONLY works on existing files - fails if file doesn't exist (use memory_bank_write for new files).",
+      description: "🔄 [PRIMARY TOOL - USE THIS] Update existing memory bank files to maintain clean 6-file structure. MANDATORY: Call memory_search FIRST to find existing content, then MERGE new content with existing content. Route content to appropriate core files: technical→techContext.md, architecture→systemPatterns.md, current work→activeContext.md, status→progress.md, market info→productContext.md, project info→projectbrief.md. NEVER create new files - always update existing ones.",
       inputSchema: {
         type: "object",
         properties: {
           fileName: {
             type: "string",
-            description: "The name of the file to update",
+            description: "Name of existing core file to update (projectbrief.md, productContext.md, systemPatterns.md, techContext.md, activeContext.md, progress.md)",
           },
           content: {
             type: "string",
-            description: "The new content of the file",
+            description: "MERGED content (combine new content with existing content intelligently - do not replace entirely)",
           },
           projectName: {
             type: "string",
