@@ -224,7 +224,7 @@ export default () => {
   router.setTool({
     schema: {
       name: "memory_search",
-      description: "🔍 [MANDATORY FIRST STEP] Search for files containing specific text within a project using MongoDB $rankFusion hybrid search. ALWAYS use this BEFORE any write/update operations to find existing content and determine proper file routing. Essential for maintaining 6-file structure and preventing content accumulation.",
+      description: "🔍 [MANDATORY FIRST STEP] Search for files containing specific text within a project using MongoDB $rankFusion hybrid search (June 2025). Combines vector search (voyage-3-large embeddings) with text search using reciprocal rank fusion algorithm. ALWAYS use this BEFORE any write/update operations to find existing content and determine proper file routing. Essential for maintaining 6-file structure and preventing content accumulation.",
       inputSchema: {
         type: "object",
         properties: {
@@ -267,7 +267,7 @@ export default () => {
   router.setTool({
     schema: {
       name: "memory_bank_update",
-      description: "🔄 [PRIMARY TOOL - USE THIS] Update existing memory bank files to maintain clean 6-file structure. MANDATORY: Call memory_search FIRST to find existing content, then MERGE new content with existing content. Route content to appropriate core files: technical→techContext.md, architecture→systemPatterns.md, current work→activeContext.md, status→progress.md, market info→productContext.md, project info→projectbrief.md. NEVER create new files - always update existing ones.",
+      description: "🔄 [PRIMARY TOOL - USE THIS] Update existing memory bank files to maintain clean 6-file structure using MongoDB Atlas with voyage-3-large embeddings (2025). MANDATORY: Call memory_search FIRST to find existing content using $rankFusion hybrid search, then MERGE new content with existing content. Route content to appropriate core files: technical→techContext.md, architecture→systemPatterns.md, current work→activeContext.md, status→progress.md, market info→productContext.md, project info→projectbrief.md. NEVER create new files - always update existing ones.",
       inputSchema: {
         type: "object",
         properties: {

@@ -1,6 +1,6 @@
 {
   "name": "mongodb-memory-bank-mcp",
-  "version": "3.4.0",
+  "version": "3.5.0",
   "description": "FIXED: MongoDB Memory Bank MCP with bulletproof error handling, smart operations, and session state management. Eliminates [object Object] errors and user confusion.",
   "repository": {
     "type": "git",
