@@ -301,22 +301,32 @@ export default () => {
             body: result
           };
         } catch (error: any) {
-          const errorResult = {
-            success: false,
-            projectId: '',
-            projectName: '',
-            message: `Project creation failed: ${error.message}`,
-            coreFiles: [],
-            connectionInfo: {
-              projectName: '',
-              projectId: '',
-              workingDirectory: ''
-            }
-          };
+          console.error('[CREATE_PROJECT_HANDLER] Error:', error);
+
+          // Return simple, serializable error response
+          const errorMessage = error instanceof Error ? error.message : String(error);
 
           return {
             statusCode: 500,
-            body: errorResult
+            body: {
+              success: false,
+              projectId: '',
+              projectName: '',
+              message: `❌ Project creation failed: ${errorMessage}`,
+              coreFiles: [],
+              connectionInfo: {
+                projectName: '',
+                projectId: '',
+                workingDirectory: ''
+              },
+              error: errorMessage,
+              suggestedActions: [
+                'Check your MongoDB connection',
+                'Verify project name is valid',
+                'Try with a different project name',
+                'Check server logs for details'
+              ]
+            }
           };
         }
       }
@@ -348,12 +358,23 @@ export default () => {
             body: result
           };
         } catch (error: any) {
+          console.error('[CONNECT_PROJECT_HANDLER] Error:', error);
+
+          // Return simple, serializable error response
+          const errorMessage = error instanceof Error ? error.message : String(error);
+
           return {
             statusCode: 500,
             body: {
               success: false,
-              message: `Connection failed: ${error.message}`,
-              recommendations: ['Check project name and try again']
+              error: errorMessage,
+              message: `❌ Connection failed: ${errorMessage}`,
+              suggestedActions: [
+                'Check if the project exists using list_projects',
+                'Verify the project name spelling',
+                'Try creating a new project if needed',
+                'Check server logs for details'
+              ]
             }
           };
         }

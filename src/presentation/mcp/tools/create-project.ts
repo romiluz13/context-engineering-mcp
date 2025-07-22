@@ -26,6 +26,8 @@ interface CreateProjectResponse {
     projectId: string;
     workingDirectory: string;
   };
+  error?: string;
+  suggestedActions?: string[];
 }
 
 export async function createProject(request: CreateProjectRequest): Promise<CreateProjectResponse> {
